@@ -2,6 +2,13 @@
 
 English | [Русский](README.ru.md)
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-en-dark.png">
+    <img src="docs/screenshot-en-light.png" width="420" alt="AceStream Player window">
+  </picture>
+</p>
+
 A small Mac app for watching Ace Stream links. Paste an `acestream://` link, press Start, and the stream opens in IINA. Press Stop when you're done.
 
 It runs the Ace Stream engine in Docker Desktop and plays the stream in IINA. Both get installed by the app on first launch, so you never need a terminal.

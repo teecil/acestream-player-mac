@@ -2,6 +2,13 @@
 
 [English](README.md) | Русский
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-ru-dark.png">
+    <img src="docs/screenshot-ru-light.png" width="420" alt="Окно AceStream Player">
+  </picture>
+</p>
+
 Небольшое приложение для Mac, чтобы смотреть трансляции Ace Stream. Вставляете ссылку `acestream://`, нажимаете «Запустить трансляцию», и видео открывается в IINA. Посмотрели — «Выключить».
 
 Внутри работает движок Ace Stream в Docker Desktop, видео показывает IINA. Оба приложение ставит само при первом запуске, терминал не нужен.
