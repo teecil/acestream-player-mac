@@ -60,19 +60,6 @@ scripts/engine_smoke_test.sh               # engine starts and answers
 scripts/engine_smoke_test.sh <content-id>  # plus a real stream
 ```
 
-## Status
-
-Early version. It builds and the unit tests pass in CI, but it hasn't been tested much on real Macs yet. Things to check by hand:
-
-- language picker on first launch, switching language from the menu
-
-- first-time setup on a Mac without Docker and IINA, then a second launch that downloads nothing
-- a real stream plays; Stop closes IINA and the Docker whale disappears from the menu bar
-- Open with a working link switches streams, Open with a dead link keeps the old one
-- Docker doesn't start by itself after a reboot
-- quitting the app or killing it with `kill -9` while watching leaves nothing running
-- no internet, a bad link, a stream with no peers: each shows a readable error
-
 ## Limitations
 
 - The engine image is a community build pinned to one exact build (by digest). To change it, edit `EngineImage` in [DockerService.swift](Sources/AceStreamPlayer/Services/DockerService.swift).
