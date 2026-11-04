@@ -19,7 +19,7 @@ No terminal, no settings, nothing to understand. Under the hood it runs the Ace 
 
 Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 4 GB of free space.
 
-The app is in English and Russian. It asks which one on first launch; you can switch any time with the EN | RU switch in the top-right corner of the window.
+The app is in English and Russian. It asks which one on first launch; you can switch any time in settings (the gear in the top-right corner).
 
 ## Install
 
@@ -35,6 +35,10 @@ The app is in English and Russian. It asks which one on first launch; you can sw
 - `acestream://` links clicked in a browser open in the app.
 
 If something goes wrong, the log is at `~/Library/Logs/AceStreamPlayer/AceStreamPlayer.log` (Help → Show Log).
+
+## Uninstall
+
+Settings (the gear) → Uninstall. By default it removes everything: IINA, Docker Desktop with all its data, and the app itself with its settings. After that the Mac is clean and you can install from scratch. If you want to keep something (say you like IINA or use Docker for other things), tick "I want to keep something" and untick it. Without all three parts the app won't work.
 
 ## How it works
 

@@ -30,11 +30,12 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
+                // Views whose inputs didn't change would keep text in the old language; a new
+                // identity per language makes SwiftUI rebuild all of them. (The header handles
+                // its own refresh, so the settings popover stays open while switching.)
+                .id(model.language)
                 Spacer(minLength: 0)
             }
-            // Views whose inputs didn't change would keep text in the old language; a new
-            // identity per language makes SwiftUI rebuild all of them.
-            .id(model.language)
             .padding(.horizontal, 28)
             .padding(.top, 44)
             .padding(.bottom, 22)
@@ -44,5 +45,9 @@ struct ContentView: View {
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.2), value: model.phase)
         .animation(.easeInOut(duration: 0.2), value: model.error)
+        .sheet(isPresented: $model.showingUninstall) {
+            UninstallView()
+                .environmentObject(model)
+        }
     }
 }

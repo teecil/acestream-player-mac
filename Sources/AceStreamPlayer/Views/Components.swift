@@ -119,33 +119,14 @@ struct HeaderView: View {
                     StatusPill(indicator: model.statusIndicator)
                 }
             }
+            // Rebuilt per language so the status text is re-translated.
+            .id(model.language)
             Spacer(minLength: 0)
             if model.phase != .chooseLanguage {
-                LanguageSwitch()
-                    .padding(.top, 4)
+                SettingsButton()
+                    .padding(.top, 2)
             }
         }
-    }
-}
-
-/// Small EN | RU switch in the top-right corner of the window.
-struct LanguageSwitch: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        Picker(tr("Language", "Язык"), selection: Binding(
-            get: { L10n.current },
-            set: { model.setLanguage($0) }
-        )) {
-            ForEach(AppLanguage.allCases, id: \.self) { language in
-                Text(language.shortCode).tag(language)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
-        .fixedSize()
-        .help(tr("Interface language", "Язык интерфейса"))
     }
 }
 

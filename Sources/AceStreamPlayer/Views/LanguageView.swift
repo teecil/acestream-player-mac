@@ -31,8 +31,8 @@ struct LanguageView: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("You can change it any time with the EN | RU switch in the top-right corner.")
-                Text("Поменять можно в любой момент переключателем EN | RU в правом верхнем углу.")
+                Text("You can change it any time in settings (the gear in the top-right corner).")
+                Text("Поменять можно в любой момент в настройках (шестерёнка справа вверху).")
             }
             .font(.system(size: 11))
             .foregroundStyle(.secondary)

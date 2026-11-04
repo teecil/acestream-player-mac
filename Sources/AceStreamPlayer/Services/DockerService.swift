@@ -186,7 +186,31 @@ final class DockerService {
         }
     }
 
+    /// Shuts Docker Desktop down regardless of who started it (used before uninstalling it).
+    func quitDesktopCompletely() async {
+        guard isDesktopProcessRunning else { return }
+        _ = try? await run(["desktop", "stop", "--timeout", "60"], timeout: 90)
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID) {
+            app.terminate()
+        }
+        for _ in 0..<60 where isDesktopProcessRunning {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID) {
+            app.forceTerminate()
+        }
+        launchedByUs = false
+    }
+
     // MARK: - Engine image
+
+    /// Removes every engine image this app may have downloaded.
+    func removeEngineImages() async {
+        let references = Set([EngineImage.nativeARM64, .nativeAMD64, .aceLinkAMD64].map(\.reference))
+        for reference in references {
+            _ = try? await run(["rmi", "-f", reference], timeout: 60)
+        }
+    }
 
     func hasImage(_ image: EngineImage) async -> Bool {
         guard let r = try? await run(["image", "inspect", "--format", "{{.Id}}", image.reference], timeout: 30) else {

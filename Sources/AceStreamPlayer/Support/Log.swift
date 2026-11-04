@@ -18,6 +18,9 @@ enum Log {
     static func warn(_ message: String) { write("WARN", message) }
     static func error(_ message: String) { write("ERROR", message) }
 
+    /// Waits until everything queued so far is written.
+    static func flush() { queue.sync {} }
+
     private static func write(_ level: String, _ message: String) {
         let line = "\(formatter.string(from: Date())) [\(level)] \(message)\n"
         #if DEBUG

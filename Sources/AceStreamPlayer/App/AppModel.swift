@@ -84,6 +84,16 @@ final class AppModel: ObservableObject {
     @Published private(set) var setupHint: String?
     /// UI language. The window is rebuilt when it changes, so every string is re-translated.
     @Published private(set) var language: AppLanguage = L10n.current
+    /// Uninstall dialog.
+    @Published var showingUninstall = false
+    /// Progress text while uninstalling (nil when not running).
+    @Published private(set) var uninstallStatus: String?
+    @Published var uninstallError: String?
+
+    var canUninstall: Bool {
+        !setupRunning && phase != .starting && phase != .stopping && uninstallStatus == nil
+    }
+
     /// The link that is currently playing or starting.
     @Published private(set) var activeLink: String?
     /// Non-nil while a new stream is being prepared in the background (the old one keeps playing).
@@ -183,6 +193,62 @@ final class AppModel: ObservableObject {
     func prepareForScreenshot() {
         link = ""
         phase = .idle
+    }
+
+    // MARK: - Uninstall
+
+    func uninstall(_ options: UninstallOptions) {
+        guard uninstallStatus == nil, !options.isEmpty else { return }
+        uninstallError = nil
+        uninstallStatus = tr("Preparing…", "Подготовка…")
+        Log.info("Uninstall: player=\(options.player) docker=\(options.docker) app=\(options.app)")
+        Task { [weak self] in
+            guard let self else { return }
+            // Stop whatever is running first.
+            self.switchTask?.cancel()
+            self.startTask?.cancel()
+            await self.teardown()
+            self.stats = nil
+            self.activeLink = nil
+            self.currentSource = nil
+
+            var failure: Error?
+            do {
+                try await Uninstaller.run(options, docker: self.docker, player: self.player) { [weak self] text in
+                    self?.uninstallStatus = text
+                }
+            } catch {
+                failure = error
+                Log.error("Uninstall failed: \(error)")
+            }
+
+            if failure == nil && options.app {
+                Uninstaller.removeOwnDataAndExit()
+            }
+            if options.docker {
+                Prefs.dockerInstalledByApp = false
+                Prefs.engineImageID = nil
+            }
+            if options.docker || options.player || options.app {
+                Prefs.setupCompleted = false
+            }
+            self.uninstallStatus = nil
+            if let failure {
+                let reason = (failure as? AppError)?.kind == .installCancelled
+                    ? tr("The Mac password is needed to remove apps. Try again.",
+                         "Чтобы удалить программы, нужен пароль от Mac. Попробуйте ещё раз.")
+                    : tr("Not everything could be removed. Try again.",
+                         "Удалить получилось не всё. Попробуйте ещё раз.")
+                self.uninstallError = reason
+            } else {
+                self.showingUninstall = false
+                self.notice = nil
+                self.error = nil
+            }
+            // Something is gone now: show the setup screen so it can be reinstalled.
+            self.refreshSetupItems()
+            self.phase = self.isFullySetUp ? .idle : .setup
+        }
     }
 
     // MARK: - Language
