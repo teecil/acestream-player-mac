@@ -181,7 +181,7 @@ final class AppModel: ObservableObject {
 
     /// Screenshot mode: show the main screen without touching Docker, IINA or settings.
     func prepareForScreenshot() {
-        link = "acestream://"
+        link = ""
         phase = .idle
     }
 
