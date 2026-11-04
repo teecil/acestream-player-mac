@@ -31,8 +31,8 @@ struct LanguageView: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("You can change it later: AceStream Player menu → Language.")
-                Text("Поменять можно потом: меню AceStream Player → Язык.")
+                Text("You can change it any time with the EN | RU switch in the top-right corner.")
+                Text("Поменять можно в любой момент переключателем EN | RU в правом верхнем углу.")
             }
             .font(.system(size: 11))
             .foregroundStyle(.secondary)

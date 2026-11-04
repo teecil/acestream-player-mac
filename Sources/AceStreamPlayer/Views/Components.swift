@@ -110,7 +110,7 @@ struct HeaderView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 14) {
             AppGlyph(size: 52)
             VStack(alignment: .leading, spacing: 5) {
                 Text("AceStream Player")
@@ -120,7 +120,32 @@ struct HeaderView: View {
                 }
             }
             Spacer(minLength: 0)
+            if model.phase != .chooseLanguage {
+                LanguageSwitch()
+                    .padding(.top, 4)
+            }
         }
+    }
+}
+
+/// Small EN | RU switch in the top-right corner of the window.
+struct LanguageSwitch: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        Picker(tr("Language", "Язык"), selection: Binding(
+            get: { L10n.current },
+            set: { model.setLanguage($0) }
+        )) {
+            ForEach(AppLanguage.allCases, id: \.self) { language in
+                Text(language.shortCode).tag(language)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+        .help(tr("Interface language", "Язык интерфейса"))
     }
 }
 

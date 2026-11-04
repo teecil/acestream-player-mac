@@ -14,6 +14,14 @@ enum AppLanguage: String, CaseIterable {
         }
     }
 
+    /// Two-letter label for the compact switch in the window header.
+    var shortCode: String {
+        switch self {
+        case .english: return "EN"
+        case .russian: return "RU"
+        }
+    }
+
     /// The language to highlight in the picker, guessed from the Mac's settings.
     static var systemGuess: AppLanguage {
         let preferred = Locale.preferredLanguages.first?.lowercased() ?? "en"

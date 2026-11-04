@@ -8,7 +8,7 @@ It runs the Ace Stream engine in Docker Desktop and plays the stream in IINA. Bo
 
 Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 8 GB of free space.
 
-The app is in English and Russian. It asks which one on first launch; you can switch later in the AceStream Player menu → Language.
+The app is in English and Russian. It asks which one on first launch; you can switch any time with the EN | RU switch in the top-right corner of the window.
 
 ## Install
 
