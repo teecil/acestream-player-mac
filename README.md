@@ -8,22 +8,22 @@ It runs the Ace Stream engine in Docker Desktop and plays the stream in IINA. Bo
 
 Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 8 GB of free space.
 
-The app interface is in Russian for now.
+The app is in English and Russian. It asks which one on first launch; you can switch later in the AceStream Player menu → Language.
 
 ## Install
 
 1. Download `AceStreamPlayer.dmg` from [Releases](https://github.com/teecil/acestream-player-mac/releases/latest) and drag the app into Applications.
 2. The app isn't signed with a paid Apple developer certificate, so macOS won't open it the first time. Go to System Settings → Privacy & Security, scroll down and click "Open Anyway".
-3. Press "Установить и настроить" (Install and set up). The app downloads IINA and Docker Desktop, about 1 GB, and asks for your Mac password once to install Docker. This takes 5–10 minutes and only happens once.
+3. Pick a language, then press "Install and set up". The app downloads IINA and Docker Desktop, about 1 GB, and asks for your Mac password once to install Docker. This takes 5–10 minutes and only happens once.
 
 ## Use
 
-- Paste a link and press "Запустить трансляцию" (Start). It takes 20–60 seconds, mostly waiting for Docker to boot.
-- If a stream doesn't work, paste another link and press "Открыть" (Open). The current stream keeps playing until the new one actually starts. If the new one fails, you stay on the old one.
-- Press "Выключить" (Stop) when you're done. The player closes and Docker shuts down, so nothing keeps running in the background. Quitting the app does the same.
+- Paste a link and press "Start stream". It takes 20–60 seconds, mostly waiting for Docker to boot.
+- If a stream doesn't work, paste another link and press "Open". The current stream keeps playing until the new one actually starts. If the new one fails, you stay on the old one.
+- Press "Stop" when you're done. The player closes and Docker shuts down, so nothing keeps running in the background. Quitting the app does the same.
 - `acestream://` links clicked in a browser open in the app.
 
-If something goes wrong, the log is at `~/Library/Logs/AceStreamPlayer/AceStreamPlayer.log` (menu Справка → Показать журнал работы).
+If something goes wrong, the log is at `~/Library/Logs/AceStreamPlayer/AceStreamPlayer.log` (Help → Show Log).
 
 ## How it works
 
@@ -56,6 +56,8 @@ scripts/engine_smoke_test.sh <content-id>  # plus a real stream
 ## Status
 
 Early version. It builds and the unit tests pass in CI, but it hasn't been tested much on real Macs yet. Things to check by hand:
+
+- language picker on first launch, switching language from the menu
 
 - first-time setup on a Mac without Docker and IINA, then a second launch that downloads nothing
 - a real stream plays; Stop closes IINA and the Docker whale disappears from the menu bar

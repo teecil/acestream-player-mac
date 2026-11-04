@@ -57,14 +57,14 @@ struct AppGlyph: View {
 extension StatusIndicator {
     var text: String {
         switch self {
-        case .checking: return "Проверяем…"
-        case .needsSetup: return "Нужна первоначальная настройка"
-        case .configuring: return "Идёт настройка"
-        case .ready: return "Готово к запуску"
-        case .preparing: return "Подготавливаем трансляцию"
-        case .live: return "Идёт трансляция"
-        case .stopping: return "Выключаем…"
-        case .problem: return "Требуется внимание"
+        case .checking: return tr("Checking…", "Проверяем…")
+        case .needsSetup: return tr("First-time setup needed", "Нужна первоначальная настройка")
+        case .configuring: return tr("Setting up", "Идёт настройка")
+        case .ready: return tr("Ready", "Готово к запуску")
+        case .preparing: return tr("Preparing the stream", "Подготавливаем трансляцию")
+        case .live: return tr("Live", "Идёт трансляция")
+        case .stopping: return tr("Stopping…", "Выключаем…")
+        case .problem: return tr("Needs attention", "Требуется внимание")
         }
     }
 
@@ -115,7 +115,9 @@ struct HeaderView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("AceStream Player")
                     .font(.system(size: 22, weight: .semibold))
-                StatusPill(indicator: model.statusIndicator)
+                if model.phase != .chooseLanguage {
+                    StatusPill(indicator: model.statusIndicator)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -144,9 +146,9 @@ struct ErrorCard: View {
                     HStack(spacing: 10) {
                         switch error.recovery {
                         case .retry:
-                            Button("Повторить") { model.retry() }
+                            Button(tr("Retry", "Повторить")) { model.retry() }
                         case .setup:
-                            Button("Установить компоненты") { model.goToSetup() }
+                            Button(tr("Install components", "Установить компоненты")) { model.goToSetup() }
                         case .dismissOnly:
                             EmptyView()
                         }
@@ -164,7 +166,7 @@ struct ErrorCard: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Скрыть")
+            .help(tr("Hide", "Скрыть"))
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -197,11 +199,41 @@ enum Formatting {
 
     /// The engine reports speed in KB/s.
     static func speed(_ kilobytesPerSecond: Int) -> String {
-        bytes(Int64(kilobytesPerSecond) * 1024) + "/с"
+        bytes(Int64(kilobytesPerSecond) * 1024) + tr("/s", "/с")
     }
 }
 
 enum Layout {
     /// Fits comfortably on a 13" MacBook Air without scrolling.
     static let windowSize = CGSize(width: 480, height: 600)
+}
+
+/// Shown while things install or start: Docker, IINA and macOS dialogs pop up on their own,
+/// and people tend to close them.
+struct DontTouchNote: View {
+    var extra: String?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(tr("Some windows may pop up on their own. That's normal, don't touch anything.",
+                        "Что-то может открываться, это нормально, ничего не трогайте."))
+                    .font(.system(size: 12, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let extra {
+                    Text(extra)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CardBackground(tint: .orange, fillOpacity: 0.08))
+    }
 }

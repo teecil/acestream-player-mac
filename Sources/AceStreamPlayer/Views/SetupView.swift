@@ -7,9 +7,9 @@ struct SetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Первоначальная настройка")
+                Text(tr("First-time setup", "Первоначальная настройка"))
                     .font(.system(size: 15, weight: .semibold))
-                Text("Нужны три бесплатных компонента. Они устанавливаются один раз — потом трансляции будут запускаться сразу.")
+                Text(tr("The app needs three free components. They're installed once, and after that streams start right away.", "Нужны три бесплатных компонента. Они устанавливаются один раз — потом трансляции будут запускаться сразу."))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -27,9 +27,8 @@ struct SetupView: View {
             .padding(.vertical, 4)
             .background(CardBackground())
 
-            if model.needsAdminForSetup && !model.setupRunning && model.error == nil {
-                HintRow(symbol: "lock.shield",
-                        text: "macOS попросит пароль от этого Mac — он нужен, чтобы установить Docker Desktop. Загрузка — около 1 ГБ.")
+            if model.error == nil {
+                DontTouchNote(extra: passwordNote)
             }
 
             Button {
@@ -56,10 +55,19 @@ struct SetupView: View {
         }
     }
 
+    private var passwordNote: String? {
+        guard model.needsAdminForSetup else { return nil }
+        return model.setupRunning
+            ? tr("The only thing to do: enter your Mac password when macOS asks for it.",
+                 "Единственное, что нужно: ввести пароль от Mac, когда macOS попросит.")
+            : tr("macOS will ask for this Mac's password once. It's needed to install Docker Desktop. The download is about 1 GB.",
+                 "macOS один раз попросит пароль от этого Mac, он нужен для установки Docker Desktop. Загрузка около 1 ГБ.")
+    }
+
     private var buttonTitle: String {
-        if model.setupRunning { return "Настраиваем…" }
-        if model.error != nil { return "Повторить" }
-        return model.setupItems.allSatisfy { $0.status == .installed } ? "Продолжить" : "Установить и настроить"
+        if model.setupRunning { return tr("Setting up…", "Настраиваем…") }
+        if model.error != nil { return tr("Retry", "Повторить") }
+        return model.setupItems.allSatisfy { $0.status == .installed } ? tr("Continue", "Продолжить") : tr("Install and set up", "Установить и настроить")
     }
 }
 
@@ -110,11 +118,11 @@ struct SetupRow: View {
     private var trailing: some View {
         switch item.status {
         case .installed:
-            Label("Готово", systemImage: "checkmark.circle.fill")
+            Label(tr("Done", "Готово"), systemImage: "checkmark.circle.fill")
                 .labelStyle(.iconOnly)
                 .font(.system(size: 17))
                 .foregroundStyle(.green)
-                .help("Установлено")
+                .help(tr("Installed", "Установлено"))
         case .working(_, let fraction):
             if fraction == nil {
                 ProgressView().controlSize(.small)
@@ -128,7 +136,7 @@ struct SetupRow: View {
                 .font(.system(size: 17))
                 .foregroundStyle(.red)
         case .pending:
-            Text("Нужно установить")
+            Text(tr("Not installed", "Нужно установить"))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }

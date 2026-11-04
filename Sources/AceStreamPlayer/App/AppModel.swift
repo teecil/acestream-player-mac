@@ -8,17 +8,17 @@ struct SetupItem: Identifiable, Equatable {
 
         var title: String {
             switch self {
-            case .player: return "Видеоплеер IINA"
+            case .player: return tr("IINA video player", "Видеоплеер IINA")
             case .docker: return "Docker Desktop"
-            case .engine: return "Движок трансляций"
+            case .engine: return tr("Stream engine", "Движок трансляций")
             }
         }
 
         var subtitle: String {
             switch self {
-            case .player: return "Показывает видео"
-            case .docker: return "Изолированная среда для движка"
-            case .engine: return "Подключается к трансляциям Ace Stream"
+            case .player: return tr("Plays the video", "Показывает видео")
+            case .docker: return tr("Isolated environment for the engine", "Изолированная среда для движка")
+            case .engine: return tr("Connects to Ace Stream broadcasts", "Подключается к трансляциям Ace Stream")
             }
         }
 
@@ -50,7 +50,7 @@ enum StatusIndicator: Equatable {
 @MainActor
 final class AppModel: ObservableObject {
     enum Phase: Equatable {
-        case launching, setup, idle, starting, playing, stopping
+        case launching, chooseLanguage, setup, idle, starting, playing, stopping
     }
 
     enum StartStep: Int, CaseIterable, Identifiable {
@@ -60,10 +60,10 @@ final class AppModel: ObservableObject {
 
         var title: String {
             switch self {
-            case .system: return "Подготовка системы"
-            case .engine: return "Запуск движка трансляций"
-            case .stream: return "Подключение к трансляции"
-            case .player: return "Открытие плеера"
+            case .system: return tr("Preparing the system", "Подготовка системы")
+            case .engine: return tr("Starting the stream engine", "Запуск движка трансляций")
+            case .stream: return tr("Connecting to the stream", "Подключение к трансляции")
+            case .player: return tr("Opening the player", "Открытие плеера")
             }
         }
     }
@@ -117,7 +117,7 @@ final class AppModel: ObservableObject {
 
     var statusIndicator: StatusIndicator {
         switch phase {
-        case .launching: return .checking
+        case .launching, .chooseLanguage: return .checking
         case .setup: return setupRunning ? .configuring : (error != nil ? .problem : .needsSetup)
         case .idle: return error != nil ? .problem : .ready
         case .starting: return .preparing
@@ -151,7 +151,7 @@ final class AppModel: ObservableObject {
             await self.docker.stopDesktopIfManaged()
         }
 
-        phase = isFullySetUp ? .idle : .setup
+        phase = Prefs.language == nil ? .chooseLanguage : (isFullySetUp ? .idle : .setup)
     }
 
     private func phaseDidChange() {
@@ -175,6 +175,23 @@ final class AppModel: ObservableObject {
         setStatus(.player, player.isInstalled ? .installed : .pending)
         setStatus(.docker, docker.isInstalled ? .installed : .pending)
         setStatus(.engine, (Prefs.setupCompleted && docker.isInstalled) ? .installed : .pending)
+    }
+
+    // MARK: - Language
+
+    /// First launch: picks the language and moves on to setup. Later (from the menu): switches
+    /// the interface language in place.
+    func setLanguage(_ language: AppLanguage) {
+        Log.info("Language: \(language.rawValue)")
+        L10n.current = language
+        Prefs.language = language
+        objectWillChange.send()
+        AppDelegate.shared?.rebuildMenu()
+        if phase == .chooseLanguage {
+            phase = isFullySetUp ? .idle : .setup
+        } else if !setupRunning {
+            refreshSetupItems()
+        }
     }
 
     func goToSetup() {
@@ -201,27 +218,27 @@ final class AppModel: ObservableObject {
         do {
             if !player.isInstalled {
                 try requireInternet()
-                setStatus(.player, .working("Подготовка…", nil))
+                setStatus(.player, .working(tr("Preparing…", "Подготовка…"), nil))
                 try await Installer.installIINA(report: progressReporter(for: .player))
                 guard player.isInstalled else {
-                    throw AppError.installFailed(component: "IINA", detail: "приложение не появилось в папке «Программы»")
+                    throw AppError.installFailed(component: "IINA", detail: tr("the app did not appear in Applications", "приложение не появилось в папке «Программы»"))
                 }
             }
             setStatus(.player, .installed)
 
             if !docker.isInstalled {
                 try requireInternet()
-                setStatus(.docker, .working("Подготовка…", nil))
+                setStatus(.docker, .working(tr("Preparing…", "Подготовка…"), nil))
                 try await Installer.installDocker(report: progressReporter(for: .docker))
                 guard docker.isInstalled else {
-                    throw AppError.installFailed(component: "Docker Desktop", detail: "приложение не появилось в папке «Программы»")
+                    throw AppError.installFailed(component: "Docker Desktop", detail: tr("the app did not appear in Applications", "приложение не появилось в папке «Программы»"))
                 }
                 Prefs.dockerInstalledByApp = true
             }
             setStatus(.docker, .installed)
 
             // Start Docker, fetch the engine and prove it actually starts — then stop it again.
-            setStatus(.engine, .working("Запускаем Docker Desktop…", nil))
+            setStatus(.engine, .working(tr("Starting Docker Desktop…", "Запускаем Docker Desktop…"), nil))
             try await docker.ensureRunning { [weak self] text in
                 self?.setStatus(.engine, .working(text, nil))
             }
@@ -230,7 +247,7 @@ final class AppModel: ObservableObject {
                 self?.setStatus(.engine, .working(text, fraction))
             }
             await teardown()
-            setStatus(.engine, .working("Выключаем Docker до первой трансляции…", nil))
+            setStatus(.engine, .working(tr("Shutting Docker down until the first stream…", "Выключаем Docker до первой трансляции…"), nil))
             await docker.stopDesktopIfManaged()
             setStatus(.engine, .installed)
 
@@ -345,15 +362,15 @@ final class AppModel: ObservableObject {
         do {
             await launchCleanupTask?.value
 
-            setStep(.system, "Проверяем готовность…")
+            setStep(.system, tr("Checking that everything is ready…", "Проверяем готовность…"))
             try await docker.ensureRunning { [weak self] text in self?.stepDetail = text }
             try Task.checkCancellation()
 
-            setStep(.engine, "Запускаем движок…")
+            setStep(.engine, tr("Starting the engine…", "Запускаем движок…"))
             let client = try await launchEngine { [weak self] text, _ in self?.stepDetail = text }
             try Task.checkCancellation()
 
-            setStep(.stream, "Подключаемся к трансляции…")
+            setStep(.stream, tr("Connecting to the stream…", "Подключаемся к трансляции…"))
             try requireInternet()
             let session: EngineSession
             do {
@@ -368,7 +385,7 @@ final class AppModel: ObservableObject {
                                         onStats: { [weak self] value in self?.stats = value })
             try Task.checkCancellation()
 
-            setStep(.player, "Открываем IINA…")
+            setStep(.player, tr("Opening IINA…", "Открываем IINA…"))
             try player.launch(session.playbackURL, title: "AceStream Player")
             phase = .playing
             startMonitoring()
@@ -399,7 +416,7 @@ final class AppModel: ObservableObject {
             let docker = self.docker
             do {
                 guard await docker.isEngineRunning() else { throw AppError.engineCrashed }
-                report("Ждём готовности движка…", nil)
+                report(tr("Waiting for the engine…", "Ждём готовности движка…"), nil)
                 try await existing.waitUntilReady(timeout: 60) { await docker.isEngineRunning() }
                 Log.info("Reusing running engine on port \(existing.port)")
                 return existing
@@ -421,23 +438,23 @@ final class AppModel: ObservableObject {
             try Task.checkCancellation()
             if index > 0 {
                 Log.warn("Trying fallback engine image \(image.reference) [\(image.platform)]")
-                report("Подбираем совместимую версию движка…", nil)
+                report(tr("Trying a compatible engine version…", "Подбираем совместимую версию движка…"), nil)
             }
             do {
                 if !(await docker.hasImage(image)) {
                     try requireInternet()
                     if SystemInfo.freeDiskGB < 2 { throw AppError.diskFull(needGB: 2) }
-                    report("Загружаем движок трансляций (только один раз)…", nil)
+                    report(tr("Downloading the stream engine (one time only)…", "Загружаем движок трансляций (только один раз)…"), nil)
                     try await docker.pull(image) { fraction in
                         Task { @MainActor in
                             let percent = fraction.map { " — \(Int($0 * 100))%" } ?? ""
-                            report("Загружаем движок трансляций\(percent)", fraction)
+                            report(tr("Downloading the stream engine\(percent)", "Загружаем движок трансляций\(percent)"), fraction)
                         }
                     }
                 }
                 try Task.checkCancellation()
 
-                report("Запускаем движок…", nil)
+                report(tr("Starting the engine…", "Запускаем движок…"), nil)
                 let port = try await docker.startEngine(image)
                 if let cli = docker.cliPath {
                     watchdog.arm(dockerCLI: cli, environment: docker.environment(), stopDocker: docker.managesDesktop)
@@ -445,7 +462,7 @@ final class AppModel: ObservableObject {
                 let client = EngineClient(port: port)
                 self.client = client
 
-                report("Ждём готовности движка…", nil)
+                report(tr("Waiting for the engine…", "Ждём готовности движка…"), nil)
                 let docker = self.docker
                 try await client.waitUntilReady(timeout: 90) { await docker.isEngineRunning() }
                 Prefs.engineImageID = image.id
@@ -500,20 +517,20 @@ final class AppModel: ObservableObject {
                     return
                 case "prebuf", "buf":
                     if current.peers > 0 {
-                        progress("Буферизация… источников: \(current.peers)")
+                        progress(tr("Buffering… sources: \(current.peers)", "Буферизация… источников: \(current.peers)"))
                         let since = bufferingWithPeersSince ?? Date()
                         bufferingWithPeersSince = since
                         // Some engine builds only switch to "dl" once a player reads the stream.
                         if Date().timeIntervalSince(since) > 15 { return }
                     } else {
-                        progress("Ищем источники трансляции…")
+                        progress(tr("Looking for stream sources…", "Ищем источники трансляции…"))
                     }
                 case "check", "checking":
-                    progress("Проверяем данные…")
+                    progress(tr("Checking data…", "Проверяем данные…"))
                 case "err", "error":
                     throw AppError.streamNotFound
                 default:
-                    progress("Подключаемся…")
+                    progress(tr("Connecting…", "Подключаемся…"))
                 }
             } catch let appError as AppError {
                 throw appError
@@ -546,7 +563,7 @@ final class AppModel: ObservableObject {
         }
         if source == currentSource {
             // Back to the link that is already on screen: just drop any pending switch.
-            if switchTask != nil { cancelSwitch() } else { notice = "Эта трансляция уже открыта." }
+            if switchTask != nil { cancelSwitch() } else { notice = tr("This stream is already open.", "Эта трансляция уже открыта.") }
             return
         }
 
@@ -556,7 +573,7 @@ final class AppModel: ObservableObject {
         previous?.cancel()
         switchGeneration += 1
         let generation = switchGeneration
-        switchDetail = "Подключаемся к новой трансляции…"
+        switchDetail = tr("Connecting to the new stream…", "Подключаемся к новой трансляции…")
         switchTask = Task { [weak self] in
             await previous?.value
             await self?.runSwitch(to: source, link: newLink, generation: generation)
@@ -594,7 +611,7 @@ final class AppModel: ObservableObject {
             guard phase == .playing else { throw CancellationError() }
 
             // The new stream delivers video: swap players.
-            switchDetail = "Открываем новую трансляцию…"
+            switchDetail = tr("Opening the new stream…", "Открываем новую трансляцию…")
             monitorTask?.cancel()
             await player.stop()
             await client.stop(oldSession)
@@ -618,8 +635,8 @@ final class AppModel: ObservableObject {
             Log.error("Switch failed: \(error)")
             let reason = AppError.wrap(error)
             if phase == .playing && player.isRunning {
-                self.error = AppError(reason.kind, "Новая трансляция не запустилась",
-                                      "Продолжаем показывать текущую. \(reason.message)")
+                self.error = AppError(reason.kind, tr("The new stream didn't start", "Новая трансляция не запустилась"),
+                                      tr("The current one keeps playing. \(reason.message)", "Продолжаем показывать текущую. \(reason.message)"))
                 if monitorTask == nil || monitorTask?.isCancelled == true { startMonitoring() }
             } else if phase == .playing {
                 // The old player was already closed — nothing left to fall back to.
@@ -647,7 +664,7 @@ final class AppModel: ObservableObject {
                 // While a new link is being prepared, the old window may be closed on purpose.
                 if self.switchTask == nil, await self.player.hasGoneIdleAfterPlayback() {
                     Log.info("Player window closed or stream ended")
-                    self.stopStream(notice: "Плеер закрыт — трансляция выключена.")
+                    self.stopStream(notice: tr("The player was closed, so the stream was stopped.", "Плеер закрыт — трансляция выключена."))
                     return
                 }
                 guard let client = self.client, let session = self.session else { return }
@@ -670,7 +687,7 @@ final class AppModel: ObservableObject {
 
     private func playerClosedByUser() {
         guard phase == .playing, switchTask == nil else { return }
-        stopStream(notice: "Плеер закрыт — трансляция выключена.")
+        stopStream(notice: tr("The player was closed, so the stream was stopped.", "Плеер закрыт — трансляция выключена."))
     }
 
     // MARK: - Stop
@@ -740,7 +757,7 @@ final class AppModel: ObservableObject {
             switchStream()
         case .starting:
             submitLink()
-        case .stopping, .launching, .setup:
+        case .stopping, .launching, .chooseLanguage, .setup:
             autostartPending = true
         }
     }

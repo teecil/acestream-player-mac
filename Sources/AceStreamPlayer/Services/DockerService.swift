@@ -102,7 +102,7 @@ final class DockerService {
         if !isDesktopProcessRunning {
             DockerSettings.applyQuietDefaultsIfManaged()
             Log.info("Starting Docker Desktop")
-            report("Запускаем Docker Desktop…")
+            report(tr("Starting Docker Desktop…", "Запускаем Docker Desktop…"))
             let config = NSWorkspace.OpenConfiguration()
             config.activates = false
             config.hides = true
@@ -115,7 +115,7 @@ final class DockerService {
                 throw AppError.dockerStartFailed
             }
         } else {
-            report("Ждём, пока Docker Desktop будет готов…")
+            report(tr("Waiting for Docker Desktop to be ready…", "Ждём, пока Docker Desktop будет готов…"))
         }
 
         let started = Date()
@@ -139,7 +139,7 @@ final class DockerService {
             }
             if !told && Date().timeIntervalSince(started) > 45 {
                 told = true
-                report("Docker Desktop запускается дольше обычного. Если появилось его окно — его можно закрыть.")
+                report(tr("Docker Desktop is taking longer than usual. If its window appeared, you can close it.", "Docker Desktop запускается дольше обычного. Если появилось его окно — его можно закрыть."))
             }
         }
         Log.error("Docker engine did not become ready in time")

@@ -17,6 +17,8 @@ struct ContentView: View {
                             Spacer()
                         }
                         .padding(.top, 60)
+                    case .chooseLanguage:
+                        LanguageView()
                     case .setup:
                         SetupView()
                     case .idle, .starting, .playing, .stopping:

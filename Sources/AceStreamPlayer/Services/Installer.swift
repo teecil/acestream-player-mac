@@ -21,21 +21,21 @@ enum Installer {
     // MARK: - IINA
 
     static func installIINA(report: @escaping Report) async throws {
-        report(Progress(text: "Ищем последнюю версию…", fraction: nil))
+        report(Progress(text: tr("Looking for the latest version…", "Ищем последнюю версию…"), fraction: nil))
         let asset = try await latestIINAAsset()
         let dmg = AppPaths.downloads.appendingPathComponent(asset.name)
-        try await download(asset.url, to: dmg, label: "Загрузка IINA", component: "IINA", report: report)
+        try await download(asset.url, to: dmg, label: tr("Downloading IINA", "Загрузка IINA"), component: "IINA", report: report)
 
-        report(Progress(text: "Проверяем подлинность…", fraction: nil))
+        report(Progress(text: tr("Verifying…", "Проверяем подлинность…"), fraction: nil))
         let mount = try await DiskImage.attach(dmg)
         do {
             let contents = try FileManager.default.contentsOfDirectory(at: mount, includingPropertiesForKeys: nil)
             guard let app = contents.first(where: { $0.pathExtension == "app" }) else {
-                throw AppError.installFailed(component: "IINA", detail: "в загруженном файле нет приложения")
+                throw AppError.installFailed(component: "IINA", detail: tr("the downloaded file has no app inside", "в загруженном файле нет приложения"))
             }
             try verifyArchitecture(app, component: "IINA")
             try await verifyGatekeeper(app, component: "IINA")
-            report(Progress(text: "Устанавливаем в «Программы»…", fraction: nil))
+            report(Progress(text: tr("Installing into Applications…", "Устанавливаем в «Программы»…"), fraction: nil))
             try await copyApp(app, to: URL(fileURLWithPath: "/Applications/IINA.app"))
         } catch {
             await DiskImage.detach(mount)
@@ -83,35 +83,35 @@ enum Installer {
 
         // A finished download from an earlier attempt is reused (files land here only when complete).
         if !FileManager.default.fileExists(atPath: dmg.path) {
-            try await download(source, to: dmg, label: "Загрузка Docker Desktop", component: "Docker Desktop", report: report)
+            try await download(source, to: dmg, label: tr("Downloading Docker Desktop", "Загрузка Docker Desktop"), component: "Docker Desktop", report: report)
         }
-        report(Progress(text: "Проверяем подлинность…", fraction: nil))
+        report(Progress(text: tr("Verifying…", "Проверяем подлинность…"), fraction: nil))
         let mount: URL
         do {
             mount = try await DiskImage.attach(dmg)
         } catch {
             Log.warn("Cached Docker.dmg unusable, downloading again")
             try? FileManager.default.removeItem(at: dmg)
-            try await download(source, to: dmg, label: "Загрузка Docker Desktop", component: "Docker Desktop", report: report)
+            try await download(source, to: dmg, label: tr("Downloading Docker Desktop", "Загрузка Docker Desktop"), component: "Docker Desktop", report: report)
             mount = try await DiskImage.attach(dmg)
         }
 
         do {
             let app = mount.appendingPathComponent("Docker.app")
             guard FileManager.default.fileExists(atPath: app.path) else {
-                throw AppError.installFailed(component: "Docker Desktop", detail: "в загруженном файле нет приложения")
+                throw AppError.installFailed(component: "Docker Desktop", detail: tr("the downloaded file has no app inside", "в загруженном файле нет приложения"))
             }
             try verifyArchitecture(app, component: "Docker Desktop")
             try await verifyGatekeeper(app, component: "Docker Desktop")
 
-            report(Progress(text: "Устанавливаем… macOS попросит пароль от Mac", fraction: nil))
+            report(Progress(text: tr("Installing… macOS will ask for your Mac password", "Устанавливаем… macOS попросит пароль от Mac"), fraction: nil))
             // Official unattended install: accepts the license and performs the privileged
             // configuration now, so Docker Desktop never asks for it on first launch.
             let installer = app.appendingPathComponent("Contents/MacOS/install").path
             let command = "\(ShellQuote.sh(installer)) --accept-license --user=\(ShellQuote.sh(NSUserName()))"
             try await Privileged.run(
                 command,
-                prompt: "AceStream Player устанавливает Docker Desktop — среду, в которой безопасно работает движок трансляций."
+                prompt: tr("AceStream Player is installing Docker Desktop, the environment the stream engine runs in.", "AceStream Player устанавливает Docker Desktop — среду, в которой безопасно работает движок трансляций.")
             )
         } catch {
             await DiskImage.detach(mount)
@@ -121,7 +121,7 @@ enum Installer {
         try? FileManager.default.removeItem(at: dmg)
 
         guard FileManager.default.fileExists(atPath: "/Applications/Docker.app") else {
-            throw AppError.installFailed(component: "Docker Desktop", detail: "приложение не появилось в папке «Программы»")
+            throw AppError.installFailed(component: "Docker Desktop", detail: tr("the app did not appear in Applications", "приложение не появилось в папке «Программы»"))
         }
         Log.info("Docker Desktop installed")
     }
@@ -136,7 +136,7 @@ enum Installer {
         do {
             try await Downloader.download(url, to: destination) { fraction, bytes in
                 let mb = Int(Double(bytes) / 1_048_576)
-                report(Progress(text: "\(label) — \(mb) МБ", fraction: fraction))
+                report(Progress(text: tr("\(label): \(mb) MB", "\(label) — \(mb) МБ"), fraction: fraction))
             }
         } catch is CancellationError {
             throw CancellationError()
@@ -161,14 +161,14 @@ enum Installer {
         let plist = app.appendingPathComponent("Contents/Info.plist")
         guard let info = NSDictionary(contentsOf: plist),
               let executableName = info["CFBundleExecutable"] as? String else {
-            throw AppError.installFailed(component: component, detail: "повреждённый файл установки")
+            throw AppError.installFailed(component: component, detail: tr("the installer file is damaged", "повреждённый файл установки"))
         }
         let executable = app.appendingPathComponent("Contents/MacOS/\(executableName)")
         let types = MachOArch.cpuTypes(ofFileAt: executable)
         let needed = SystemInfo.isAppleSilicon ? MachOArch.cpuARM64 : MachOArch.cpuX86_64
         guard types.contains(needed) else {
             Log.error("\(component): CPU types \(types) do not include \(needed)")
-            throw AppError.installFailed(component: component, detail: "эта версия не подходит для вашего Mac")
+            throw AppError.installFailed(component: component, detail: tr("this version doesn't fit your Mac", "эта версия не подходит для вашего Mac"))
         }
         Log.info("\(component): native architecture confirmed")
     }
@@ -180,7 +180,7 @@ enum Installer {
         )
         Log.info("spctl \(component): status \(result.status) \(result.stderr.trimmed)")
         guard result.ok else {
-            throw AppError.installFailed(component: component, detail: "файл не прошёл проверку подлинности Apple")
+            throw AppError.installFailed(component: component, detail: tr("the file failed Apple's authenticity check", "файл не прошёл проверку подлинности Apple"))
         }
     }
 
@@ -190,7 +190,7 @@ enum Installer {
         Log.warn("ditto as user failed (\(direct.stderr.trimmed)); retrying with administrator rights")
         try await Privileged.run(
             "/usr/bin/ditto \(ShellQuote.sh(source.path)) \(ShellQuote.sh(destination.path))",
-            prompt: "AceStream Player устанавливает видеоплеер IINA в папку «Программы»."
+            prompt: tr("AceStream Player is installing the IINA video player into Applications.", "AceStream Player устанавливает видеоплеер IINA в папку «Программы».")
         )
     }
 }
@@ -205,7 +205,7 @@ enum Privileged {
         if result.ok { return }
         Log.error("Privileged command failed (\(result.status)): \(result.stderr.trimmed)")
         if result.stderr.contains("-128") { throw AppError.installCancelled }
-        throw AppError.installFailed(component: "компонент", detail: "установщик завершился с ошибкой")
+        throw AppError.installFailed(component: tr("component", "компонент"), detail: tr("the installer failed", "установщик завершился с ошибкой"))
     }
 }
 
@@ -222,7 +222,7 @@ enum DiskImage {
         guard result.ok else {
             Log.error("hdiutil attach failed: \(result.stderr.trimmed)")
             try? FileManager.default.removeItem(at: mount)
-            throw AppError.installFailed(component: "компонент", detail: "загруженный файл повреждён")
+            throw AppError.installFailed(component: tr("component", "компонент"), detail: tr("the downloaded file is damaged", "загруженный файл повреждён"))
         }
         return mount
     }

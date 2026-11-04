@@ -60,6 +60,12 @@ enum Prefs {
         set { d.set(newValue, forKey: "engineImageID") }
     }
 
+    /// UI language; nil until the user picks one on first launch.
+    static var language: AppLanguage? {
+        get { d.string(forKey: "language").flatMap(AppLanguage.init(rawValue:)) }
+        set { d.set(newValue?.rawValue, forKey: "language") }
+    }
+
     /// True when Docker Desktop on this Mac was installed by this app (so it is ours to stop).
     static var dockerInstalledByApp: Bool {
         get { d.bool(forKey: "dockerInstalledByApp") }

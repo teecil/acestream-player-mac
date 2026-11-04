@@ -14,14 +14,14 @@ struct PlaybackView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Ссылка на трансляцию")
+                Text(tr("Stream link", "Ссылка на трансляцию"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                 linkField
                 if model.phase == .playing || model.phase == .starting {
                     Text(model.phase == .playing
-                         ? "Можно вставить другую ссылку и нажать «Открыть» — текущая будет идти, пока новая не запустится."
-                         : "Не запускается? Вставьте другую ссылку и нажмите «Открыть».")
+                         ? tr("You can paste another link and press Open. The current stream keeps playing until the new one starts.", "Можно вставить другую ссылку и нажать «Открыть» — текущая будет идти, пока новая не запустится.")
+                         : tr("Not starting? Paste another link and press Open.", "Не запускается? Вставьте другую ссылку и нажмите «Открыть»."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -39,10 +39,13 @@ struct PlaybackView: View {
             case .starting:
                 StepsView(current: model.step, detail: model.stepDetail)
                     .transition(.opacity)
+                if model.error == nil {
+                    DontTouchNote()
+                }
             case .stopping:
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
-                    Text("Выключаем трансляцию и освобождаем ресурсы…")
+                    Text(tr("Stopping the stream and freeing up resources…", "Выключаем трансляцию и освобождаем ресурсы…"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
@@ -90,24 +93,24 @@ struct PlaybackView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .help("Очистить")
+                .help(tr("Clear", "Очистить"))
             }
             if editable {
-                Button("Вставить") {
+                Button(tr("Paste", "Вставить")) {
                     model.pasteFromClipboard()
                     model.error = nil
                 }
                 .controlSize(.small)
-                .help("Вставить ссылку из буфера обмена")
+                .help(tr("Paste the link from the clipboard", "Вставить ссылку из буфера обмена"))
             }
             if model.canOpenOtherLink {
-                Button("Открыть") { model.submitLink() }
+                Button(tr("Open", "Открыть")) { model.submitLink() }
                     .buttonStyle(.borderedProminent)
                     .tint(Brand.accent)
                     .controlSize(.small)
                     .help(model.phase == .playing
-                          ? "Открыть эту ссылку. Текущая трансляция будет идти, пока новая не запустится."
-                          : "Бросить текущую попытку и открыть эту ссылку")
+                          ? tr("Open this link. The current stream keeps playing until the new one starts.", "Открыть эту ссылку. Текущая трансляция будет идти, пока новая не запустится.")
+                          : tr("Drop the current attempt and open this link", "Бросить текущую попытку и открыть эту ссылку"))
             }
         }
         .padding(.horizontal, 12)
@@ -133,15 +136,15 @@ struct SwitchingCard: View {
         HStack(alignment: .top, spacing: 10) {
             ProgressView().controlSize(.small)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Открываем новую трансляцию")
+                Text(tr("Opening the new stream", "Открываем новую трансляцию"))
                     .font(.system(size: 13, weight: .semibold))
-                Text(detail + " Текущая продолжает идти.")
+                Text(detail + tr(" The current one keeps playing.", " Текущая продолжает идти."))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Button("Отменить") { model.cancelSwitch() }
+            Button(tr("Cancel", "Отменить")) { model.cancelSwitch() }
                 .controlSize(.small)
         }
         .padding(14)
@@ -157,22 +160,22 @@ struct PrimaryButton: View {
     var body: some View {
         switch model.phase {
         case .playing:
-            Button { model.stopStream() } label: { label("Выключить", symbol: "stop.fill") }
+            Button { model.stopStream() } label: { label(tr("Stop", "Выключить"), symbol: "stop.fill") }
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
                 .controlSize(.large)
         case .starting:
-            Button { model.cancelStart() } label: { label("Отменить", symbol: "xmark") }
+            Button { model.cancelStart() } label: { label(tr("Cancel", "Отменить"), symbol: "xmark") }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .keyboardShortcut(.cancelAction)
         case .stopping:
-            Button {} label: { label("Выключаем…", symbol: nil) }
+            Button {} label: { label(tr("Stopping…", "Выключаем…"), symbol: nil) }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .disabled(true)
         default:
-            Button { model.startStream() } label: { label("Запустить трансляцию", symbol: "play.fill") }
+            Button { model.startStream() } label: { label(tr("Start stream", "Запустить трансляцию"), symbol: "play.fill") }
                 .buttonStyle(.borderedProminent)
                 .tint(Brand.accent)
                 .controlSize(.large)
@@ -249,15 +252,15 @@ struct LiveCard: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(RoundedRectangle(cornerRadius: 4).fill(.red))
-                Text("Трансляция открыта в плеере")
+                Text(tr("The stream is open in the player", "Трансляция открыта в плеере"))
                     .font(.system(size: 14, weight: .semibold))
             }
             HStack(spacing: 0) {
-                metric("Источники", stats.map { "\($0.peers)" } ?? "—", symbol: "person.2.fill")
-                metric("Скорость", stats.map { Formatting.speed($0.speedDown) } ?? "—", symbol: "arrow.down.circle.fill")
-                metric("Получено", stats.map { Formatting.bytes($0.downloaded) } ?? "—", symbol: "tray.and.arrow.down.fill")
+                metric(tr("Sources", "Источники"), stats.map { "\($0.peers)" } ?? "—", symbol: "person.2.fill")
+                metric(tr("Speed", "Скорость"), stats.map { Formatting.speed($0.speedDown) } ?? "—", symbol: "arrow.down.circle.fill")
+                metric(tr("Received", "Получено"), stats.map { Formatting.bytes($0.downloaded) } ?? "—", symbol: "tray.and.arrow.down.fill")
             }
-            Text("Закончили смотреть? Нажмите «Выключить» — плеер закроется сам.")
+            Text(tr("Done watching? Press Stop and the player will close by itself.", "Закончили смотреть? Нажмите «Выключить» — плеер закроется сам."))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -291,13 +294,13 @@ struct IdleHints: View {
                     .foregroundStyle(.green)
             }
             HintRow(symbol: "doc.on.clipboard",
-                    text: "Скопируйте ссылку acestream://… и вставьте её в поле выше.")
+                    text: tr("Copy an acestream://… link and paste it into the field above.", "Скопируйте ссылку acestream://… и вставьте её в поле выше."))
             HintRow(symbol: "play.circle",
-                    text: "Нажмите «Запустить трансляцию» — приложение само всё подготовит и откроет видео (обычно 20–60 секунд).")
+                    text: tr("Press Start stream. The app gets everything ready and opens the video, usually in 20–60 seconds.", "Нажмите «Запустить трансляцию» — приложение само всё подготовит и откроет видео (обычно 20–60 секунд)."))
             HintRow(symbol: "leaf",
-                    text: "Пока трансляция выключена, ничего лишнего не работает и не тратит память и батарею.")
+                    text: tr("While no stream is on, nothing extra is running, so no memory or battery is used.", "Пока трансляция выключена, ничего лишнего не работает и не тратит память и батарею."))
             HintRow(symbol: "globe",
-                    text: "Ссылки acestream:// в браузере тоже открываются в этом приложении.")
+                    text: tr("acestream:// links in your browser open in this app too.", "Ссылки acestream:// в браузере тоже открываются в этом приложении."))
         }
         .padding(.top, 4)
     }

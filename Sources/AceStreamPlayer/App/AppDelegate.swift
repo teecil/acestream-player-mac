@@ -97,6 +97,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showMainWindow()
         model.goToSetup()
     }
+
+    @objc func chooseLanguage(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let language = AppLanguage(rawValue: raw) else { return }
+        model.setLanguage(language)
+    }
+
+    /// Rebuilds the menu bar in the current language.
+    func rebuildMenu() {
+        MainMenu.install(target: self)
+    }
 }
 
 @MainActor
@@ -106,46 +116,61 @@ enum MainMenu {
 
         // Application
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "О программе AceStream Player",
+        appMenu.addItem(withTitle: tr("About AceStream Player", "О программе AceStream Player"),
                         action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Скрыть AceStream Player", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthers = appMenu.addItem(withTitle: "Скрыть остальные",
+        let languageItem = NSMenuItem(title: tr("Language", "Язык"), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        for language in AppLanguage.allCases {
+            let item = languageMenu.addItem(withTitle: language.nativeName,
+                                            action: #selector(AppDelegate.chooseLanguage(_:)), keyEquivalent: "")
+            item.target = target
+            item.representedObject = language.rawValue
+            item.state = language == L10n.current ? .on : .off
+        }
+        languageItem.submenu = languageMenu
+        appMenu.addItem(languageItem)
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: tr("Hide AceStream Player", "Скрыть AceStream Player"),
+                        action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: tr("Hide Others", "Скрыть остальные"),
                                          action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
-        appMenu.addItem(withTitle: "Показать все", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: tr("Show All", "Показать все"),
+                        action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Завершить AceStream Player", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: tr("Quit AceStream Player", "Завершить AceStream Player"),
+                        action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         addSubmenu(appMenu, titled: "AceStream Player", to: main)
 
         // Edit — required for ⌘V in the link field.
-        let edit = NSMenu(title: "Правка")
-        edit.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = edit.addItem(withTitle: "Повторить", action: Selector(("redo:")), keyEquivalent: "z")
+        let edit = NSMenu(title: tr("Edit", "Правка"))
+        edit.addItem(withTitle: tr("Undo", "Отменить"), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: tr("Redo", "Повторить"), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
-        edit.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "Копировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "Выбрать все", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        addSubmenu(edit, titled: "Правка", to: main)
+        edit.addItem(withTitle: tr("Cut", "Вырезать"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: tr("Copy", "Копировать"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: tr("Paste", "Вставить"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: tr("Select All", "Выбрать все"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        addSubmenu(edit, titled: tr("Edit", "Правка"), to: main)
 
         // Window
-        let windowMenu = NSMenu(title: "Окно")
-        windowMenu.addItem(withTitle: "Свернуть", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windowMenu.addItem(withTitle: "Закрыть", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        addSubmenu(windowMenu, titled: "Окно", to: main)
+        let windowMenu = NSMenu(title: tr("Window", "Окно"))
+        windowMenu.addItem(withTitle: tr("Minimize", "Свернуть"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: tr("Close", "Закрыть"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        addSubmenu(windowMenu, titled: tr("Window", "Окно"), to: main)
         NSApp.windowsMenu = windowMenu
 
         // Help
-        let help = NSMenu(title: "Справка")
-        let reinstall = help.addItem(withTitle: "Проверить и установить компоненты…",
+        let help = NSMenu(title: tr("Help", "Справка"))
+        let reinstall = help.addItem(withTitle: tr("Check and Install Components…", "Проверить и установить компоненты…"),
                                      action: #selector(AppDelegate.reinstallComponents(_:)), keyEquivalent: "")
         reinstall.target = target
-        let log = help.addItem(withTitle: "Показать журнал работы",
+        let log = help.addItem(withTitle: tr("Show Log", "Показать журнал работы"),
                                action: #selector(AppDelegate.showLog(_:)), keyEquivalent: "")
         log.target = target
-        addSubmenu(help, titled: "Справка", to: main)
+        addSubmenu(help, titled: tr("Help", "Справка"), to: main)
         NSApp.helpMenu = help
 
         NSApp.mainMenu = main

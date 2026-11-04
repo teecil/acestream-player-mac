@@ -15,8 +15,8 @@ enum ProcessRunnerError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .launchFailed(let detail): return "Не удалось запустить служебную команду: \(detail)"
-        case .timedOut(let command): return "Служебная команда не ответила вовремя (\(command))"
+        case .launchFailed(let detail): return tr("Couldn't run a helper command: \(detail)", "Не удалось запустить служебную команду: \(detail)")
+        case .timedOut(let command): return tr("A helper command timed out (\(command))", "Служебная команда не ответила вовремя (\(command))")
         }
     }
 }
