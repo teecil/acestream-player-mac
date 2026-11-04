@@ -8,15 +8,18 @@ struct EngineImage: Equatable {
     let reference: String
     let platform: String
 
-    /// Native ARM64 engine (multi-arch image; arm64 variant runs the Android engine natively).
+    /// Native ARM64 engine: jopsis/acestream:v3.2.17-fix, arm64 variant (Android engine,
+    /// runs without emulation). Pinned by digest so a re-pushed tag can never change what we run.
     /// https://hub.docker.com/r/jopsis/acestream
-    static let nativeARM64 = EngineImage(id: "jopsis-3.2.17-fix-arm64",
-                                         reference: "jopsis/acestream:v3.2.17-fix",
-                                         platform: "linux/arm64")
-    /// Same image for Intel Macs.
-    static let nativeAMD64 = EngineImage(id: "jopsis-3.2.17-fix-amd64",
-                                         reference: "jopsis/acestream:v3.2.17-fix",
-                                         platform: "linux/amd64")
+    static let nativeARM64 = EngineImage(
+        id: "jopsis-3.2.17-fix-arm64",
+        reference: "jopsis/acestream@sha256:39d90d2c4b069108e4958a3c997bc8558e9b649c0dfdf23bc0e8854bedfb491f",
+        platform: "linux/arm64")
+    /// Same release for Intel Macs (amd64 variant), also pinned.
+    static let nativeAMD64 = EngineImage(
+        id: "jopsis-3.2.17-fix-amd64",
+        reference: "jopsis/acestream@sha256:00dfe3ba98c204665029aa382d0f3617db423e2abd75057ad0f8bfefde926e01",
+        platform: "linux/amd64")
     /// Ace Link's engine image (x86_64 only). On Apple Silicon it runs under emulation, so it is
     /// used only if the native image cannot start.
     static let aceLinkAMD64 = EngineImage(id: "acelink-amd64",

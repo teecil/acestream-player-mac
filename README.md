@@ -34,7 +34,7 @@ If something goes wrong, the log is at `~/Library/Logs/AceStreamPlayer/AceStream
 
 ## How it works
 
-- **Engine.** Ace Stream has no official Docker image, and their Linux engine only exists for x86_64. The app uses `jopsis/acestream:v3.2.17-fix`, which has an arm64 build of the engine, so it runs without emulation. If that one won't start, it falls back to Ace Link's `blaiseio/acelink` image (amd64, emulated) and remembers which one worked.
+- **Engine.** Ace Stream has no official Docker image, and their Linux engine only exists for x86_64. The app uses `jopsis/acestream:v3.2.17-fix`, pinned by digest so it can't change under you. It has an arm64 build of the engine, so it runs without emulation. If that one won't start, it falls back to Ace Link's `blaiseio/acelink` image (amd64, emulated) and remembers which one worked.
 - **Docker Desktop** comes from docker.com and is installed with Docker's own unattended installer (`install --accept-license --user=…`). It only runs while you're watching. For the copy the app installed, start-at-login and the dashboard pop-up are turned off. A Docker Desktop you installed and started yourself is left alone.
 - **IINA** comes from its GitHub releases. The app launches its own IINA process, so Stop never closes IINA windows you opened yourself.
 - Before installing anything, the app checks it with Gatekeeper (`spctl --assess`) and makes sure the binary is arm64.
@@ -75,7 +75,11 @@ Early version. It builds and the unit tests pass in CI, but it hasn't been teste
 
 ## Limitations
 
-- The engine image is a community build pinned to one version. To change it, edit `EngineImage` in [DockerService.swift](Sources/AceStreamPlayer/Services/DockerService.swift).
+- The engine image is a community build pinned to one exact build (by digest). To change it, edit `EngineImage` in [DockerService.swift](Sources/AceStreamPlayer/Services/DockerService.swift).
 - Starting is slower than it could be, because Docker starts from scratch every time.
 - Docker Desktop is free for personal use; the app accepts its license during install.
 - To ship without the Gatekeeper warning you'd need a Developer ID certificate and notarization.
+
+## Thanks
+
+Big thanks to [jopsis](https://hub.docker.com/r/jopsis/acestream) for the multi-arch Ace Stream engine image. Without the arm64 build this app would have to run the engine under emulation.

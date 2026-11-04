@@ -4,7 +4,7 @@
 # Usage: scripts/engine_smoke_test.sh [acestream-content-id]
 set -uo pipefail
 
-IMAGE="${IMAGE:-jopsis/acestream:v3.2.17-fix}"
+IMAGE="${IMAGE:-jopsis/acestream@sha256:39d90d2c4b069108e4958a3c997bc8558e9b649c0dfdf23bc0e8854bedfb491f}"
 PLATFORM="${PLATFORM:-linux/arm64}"
 PORT="${PORT:-16899}"
 NAME="acestream-player-smoketest"
