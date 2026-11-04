@@ -9,9 +9,13 @@ English | [Русский](README.ru.md)
   </picture>
 </p>
 
-A small Mac app for watching Ace Stream links. Paste an `acestream://` link, press Start, and the stream opens in IINA. Press Stop when you're done.
+Watch Ace Stream on a Mac without setting anything up or figuring anything out.
 
-It runs the Ace Stream engine in Docker Desktop and plays the stream in IINA. Both get installed by the app on first launch, so you never need a terminal.
+- **Setup is one button.** On first launch you pick a language and press "Install and set up". The app downloads and installs everything it needs by itself.
+- **Watching is one click.** Paste an `acestream://` link and press "Start stream". The app starts everything in the background and opens the video.
+- **Stopping is one click.** Press "Stop" and everything shuts down, so nothing keeps running and eating memory or battery.
+
+No terminal, no settings, nothing to understand. Under the hood it runs the Ace Stream engine in Docker Desktop and plays the video in IINA, but you never have to deal with either.
 
 Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 8 GB of free space.
 
