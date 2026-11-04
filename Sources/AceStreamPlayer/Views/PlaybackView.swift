@@ -69,7 +69,7 @@ struct PlaybackView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onAppear { if model.phase == .idle { linkFocused = true } }
+        .onAppear { if model.phase == .idle && !Layout.solidBackground { linkFocused = true } }
     }
 
     private var linkField: some View {
