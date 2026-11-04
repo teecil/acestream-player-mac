@@ -82,6 +82,16 @@ final class AppModel: ObservableObject {
     @Published private(set) var setupItems: [SetupItem] = SetupItem.Kind.allCases.map { SetupItem(kind: $0, status: .pending) }
     @Published private(set) var setupRunning = false
     @Published private(set) var setupHint: String?
+    /// The link that is currently playing or starting.
+    @Published private(set) var activeLink: String?
+    /// Non-nil while a new stream is being prepared in the background (the old one keeps playing).
+    @Published private(set) var switchDetail: String?
+
+    /// True when the field holds a different link than the one on screen — offer "Открыть".
+    var canOpenOtherLink: Bool {
+        let text = link.trimmed
+        return (phase == .playing || phase == .starting) && !text.isEmpty && text != activeLink
+    }
 
     // MARK: - Collaborators
 
@@ -97,6 +107,9 @@ final class AppModel: ObservableObject {
     private var launchCleanupTask: Task<Void, Never>?
     private var autostartPending = false
     private var isQuitting = false
+    private var currentSource: StreamSource?
+    private var switchTask: Task<Void, Never>?
+    private var switchGeneration = 0
 
     var isFullySetUp: Bool { player.isInstalled && docker.isInstalled && Prefs.setupCompleted }
 
@@ -144,7 +157,15 @@ final class AppModel: ObservableObject {
     private func phaseDidChange() {
         if phase == .idle && autostartPending {
             autostartPending = false
-            Task { @MainActor [weak self] in self?.startStream() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.startStream()
+                // The new link could not start: don't leave the warm engine and Docker running.
+                if self.phase == .idle && self.client != nil {
+                    await self.teardown()
+                    await self.stopDockerDetached()
+                }
+            }
         }
     }
 
@@ -262,7 +283,31 @@ final class AppModel: ObservableObject {
         switch phase {
         case .setup: runSetup()
         case .idle: startStream()
+        case .playing: switchStream()
         default: break
+        }
+    }
+
+    /// Enter in the link field / the "Открыть" button.
+    func submitLink() {
+        switch phase {
+        case .idle:
+            startStream()
+        case .playing:
+            switchStream()
+        case .starting:
+            // The current link is still starting (maybe it's dead): drop it and try the new one.
+            // The engine and Docker stay up, so this is quick.
+            guard canOpenOtherLink else { return }
+            if case .failure(let failure) = LinkParser.parse(link) {
+                error = .invalidLink(failure)
+                return
+            }
+            Log.info("New link while starting: restarting with it")
+            autostartPending = true
+            cancelStart()
+        default:
+            break
         }
     }
 
@@ -286,6 +331,8 @@ final class AppModel: ObservableObject {
         guard docker.isInstalled else { error = .dockerMissing; return }
 
         Prefs.lastLink = link.trimmed
+        activeLink = link.trimmed
+        currentSource = source
         stats = nil
         step = .system
         stepDetail = ""
@@ -316,7 +363,9 @@ final class AppModel: ObservableObject {
             }
             self.session = session
             Log.info("Session opened: \(session.playbackURL.path)")
-            try await waitForStreamData(client, session)
+            try await waitForStreamData(client, session,
+                                        progress: { [weak self] text in self?.stepDetail = text },
+                                        onStats: { [weak self] value in self?.stats = value })
             try Task.checkCancellation()
 
             setStep(.player, "Открываем IINA…")
@@ -326,9 +375,13 @@ final class AppModel: ObservableObject {
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
             if cancelled { Log.info("Start cancelled") } else { Log.error("Start failed: \(error)") }
-            await teardown()
-            if !isQuitting && !autostartPending { await stopDockerDetached() }
+            // Restarting with another link keeps the engine (and Docker) warm.
+            let restarting = autostartPending && !isQuitting
+            await teardown(keepEngine: restarting)
+            if !isQuitting && !restarting { await stopDockerDetached() }
             stats = nil
+            activeLink = nil
+            currentSource = nil
             if !cancelled && !isQuitting { self.error = AppError.wrap(error) }
             if phase != .setup { phase = .idle }
         }
@@ -341,6 +394,23 @@ final class AppModel: ObservableObject {
 
     /// Starts the engine container, trying the native image first and a compatible fallback next.
     private func launchEngine(report: @escaping (String, Double?) -> Void) async throws -> EngineClient {
+        // An engine kept warm from the previous link is reused as is.
+        if let existing = self.client {
+            let docker = self.docker
+            do {
+                guard await docker.isEngineRunning() else { throw AppError.engineCrashed }
+                report("Ждём готовности движка…", nil)
+                try await existing.waitUntilReady(timeout: 60) { await docker.isEngineRunning() }
+                Log.info("Reusing running engine on port \(existing.port)")
+                return existing
+            } catch {
+                if error is CancellationError || Task.isCancelled { throw error }
+                Log.warn("Warm engine unusable (\(error)); starting a fresh one")
+                await docker.stopEngine()
+                self.client = nil
+            }
+        }
+
         var candidates = EngineImage.candidates
         if let saved = Prefs.engineImageID, let index = candidates.firstIndex(where: { $0.id == saved }), index > 0 {
             candidates.insert(candidates.remove(at: index), at: 0)
@@ -413,7 +483,9 @@ final class AppModel: ObservableObject {
     }
 
     /// Waits until the engine is really receiving video, so the player never opens on an empty stream.
-    private func waitForStreamData(_ client: EngineClient, _ session: EngineSession) async throws {
+    private func waitForStreamData(_ client: EngineClient, _ session: EngineSession,
+                                   progress: (String) -> Void,
+                                   onStats: (EngineStats) -> Void) async throws {
         let started = Date()
         var bufferingWithPeersSince: Date?
         var failures = 0
@@ -422,26 +494,26 @@ final class AppModel: ObservableObject {
             do {
                 let current = try await client.stats(session)
                 failures = 0
-                stats = current
+                onStats(current)
                 switch current.status {
                 case "dl":
                     return
                 case "prebuf", "buf":
                     if current.peers > 0 {
-                        stepDetail = "Буферизация… источников: \(current.peers)"
+                        progress("Буферизация… источников: \(current.peers)")
                         let since = bufferingWithPeersSince ?? Date()
                         bufferingWithPeersSince = since
                         // Some engine builds only switch to "dl" once a player reads the stream.
                         if Date().timeIntervalSince(since) > 15 { return }
                     } else {
-                        stepDetail = "Ищем источники трансляции…"
+                        progress("Ищем источники трансляции…")
                     }
                 case "check", "checking":
-                    stepDetail = "Проверяем данные…"
+                    progress("Проверяем данные…")
                 case "err", "error":
                     throw AppError.streamNotFound
                 default:
-                    stepDetail = "Подключаемся…"
+                    progress("Подключаемся…")
                 }
             } catch let appError as AppError {
                 throw appError
@@ -456,6 +528,113 @@ final class AppModel: ObservableObject {
         throw AppError.streamNoPeers
     }
 
+    // MARK: - Switching to another link while playing
+
+    /// Prepares the link from the field alongside the current stream. The current stream keeps
+    /// playing; the player switches only once the new one actually delivers video. If the new
+    /// one doesn't start, nothing changes on screen except a message.
+    func switchStream() {
+        guard phase == .playing, client != nil, session != nil else { return }
+        error = nil
+        notice = nil
+        let source: StreamSource
+        switch LinkParser.parse(link) {
+        case .success(let parsed): source = parsed
+        case .failure(let failure):
+            error = .invalidLink(failure)
+            return
+        }
+        if source == currentSource {
+            // Back to the link that is already on screen: just drop any pending switch.
+            if switchTask != nil { cancelSwitch() } else { notice = "Эта трансляция уже открыта." }
+            return
+        }
+
+        Log.info("Switch requested: \(source.logDescription)")
+        let newLink = link.trimmed
+        let previous = switchTask
+        previous?.cancel()
+        switchGeneration += 1
+        let generation = switchGeneration
+        switchDetail = "Подключаемся к новой трансляции…"
+        switchTask = Task { [weak self] in
+            await previous?.value
+            await self?.runSwitch(to: source, link: newLink, generation: generation)
+        }
+    }
+
+    func cancelSwitch() {
+        guard switchTask != nil else { return }
+        Log.info("Switch cancelled by user")
+        switchTask?.cancel()
+    }
+
+    private func runSwitch(to source: StreamSource, link newLink: String, generation: Int) async {
+        var newSession: EngineSession?
+        do {
+            try Task.checkCancellation()
+            guard phase == .playing, let client = self.client, let oldSession = self.session else {
+                throw CancellationError()
+            }
+            try requireInternet()
+            let opened: EngineSession
+            do {
+                opened = try await client.start(source)
+            } catch {
+                throw mapStreamStartError(error)
+            }
+            newSession = opened
+            try await waitForStreamData(client, opened,
+                                        progress: { [weak self] text in
+                                            guard let self, self.switchGeneration == generation else { return }
+                                            self.switchDetail = text
+                                        },
+                                        onStats: { _ in })
+            try Task.checkCancellation()
+            guard phase == .playing else { throw CancellationError() }
+
+            // The new stream delivers video: swap players.
+            switchDetail = "Открываем новую трансляцию…"
+            monitorTask?.cancel()
+            await player.stop()
+            await client.stop(oldSession)
+            session = opened
+            currentSource = source
+            activeLink = newLink
+            Prefs.lastLink = newLink
+            stats = nil
+            try player.launch(opened.playbackURL, title: "AceStream Player")
+            Log.info("Switched to new stream")
+            finishSwitch(generation)
+            startMonitoring()
+        } catch {
+            let cancelled = Task.isCancelled || error is CancellationError
+            // Close the half-opened new session unless it already became the current one.
+            if let opened = newSession, opened != self.session, let client = self.client {
+                await Task { @MainActor in await client.stop(opened) }.value
+            }
+            finishSwitch(generation)
+            if cancelled { return }
+            Log.error("Switch failed: \(error)")
+            let reason = AppError.wrap(error)
+            if phase == .playing && player.isRunning {
+                self.error = AppError(reason.kind, "Новая трансляция не запустилась",
+                                      "Продолжаем показывать текущую. \(reason.message)")
+                if monitorTask == nil || monitorTask?.isCancelled == true { startMonitoring() }
+            } else if phase == .playing {
+                // The old player was already closed — nothing left to fall back to.
+                self.error = reason
+                stopStream()
+            }
+        }
+    }
+
+    private func finishSwitch(_ generation: Int) {
+        guard generation == switchGeneration else { return }
+        switchTask = nil
+        switchDetail = nil
+    }
+
     // MARK: - Playback
 
     private func startMonitoring() {
@@ -465,8 +644,8 @@ final class AppModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard let self, !Task.isCancelled, self.phase == .playing else { return }
-
-                if await self.player.hasGoneIdleAfterPlayback() {
+                // While a new link is being prepared, the old window may be closed on purpose.
+                if self.switchTask == nil, await self.player.hasGoneIdleAfterPlayback() {
                     Log.info("Player window closed or stream ended")
                     self.stopStream(notice: "Плеер закрыт — трансляция выключена.")
                     return
@@ -490,7 +669,7 @@ final class AppModel: ObservableObject {
     }
 
     private func playerClosedByUser() {
-        guard phase == .playing else { return }
+        guard phase == .playing, switchTask == nil else { return }
         stopStream(notice: "Плеер закрыт — трансляция выключена.")
     }
 
@@ -507,20 +686,24 @@ final class AppModel: ObservableObject {
         Log.info("Stopping stream")
         phase = .stopping
         monitorTask?.cancel()
+        let pendingSwitch = switchTask
+        pendingSwitch?.cancel()
         Task { [weak self] in
+            await pendingSwitch?.value
             guard let self else { return }
             await self.teardown()
-            // Switching straight to another link keeps Docker up; otherwise unload everything.
-            if !self.autostartPending && !self.isQuitting { await self.stopDockerDetached() }
+            if !self.isQuitting { await self.stopDockerDetached() }
             self.stats = nil
+            self.activeLink = nil
+            self.currentSource = nil
             self.notice = notice
             self.phase = .idle
         }
     }
 
-    /// Closes our player, ends the engine session and removes our container.
-    /// Runs in its own task so that a cancelled caller cannot interrupt the cleanup.
-    private func teardown() async {
+    /// Closes our player and ends the engine session. Unless `keepEngine`, also removes our
+    /// container. Runs in its own task so that a cancelled caller cannot interrupt the cleanup.
+    private func teardown(keepEngine: Bool = false) async {
         let work = Task { @MainActor [weak self] in
             guard let self else { return }
             self.monitorTask?.cancel()
@@ -528,6 +711,7 @@ final class AppModel: ObservableObject {
             await self.player.stop()
             if let client = self.client, let session = self.session { await client.stop(session) }
             self.session = nil
+            if keepEngine && self.client != nil { return }
             if self.client != nil || self.docker.isInstalled {
                 await self.docker.stopEngine()
             }
@@ -553,11 +737,9 @@ final class AppModel: ObservableObject {
         case .idle:
             startStream()
         case .playing:
-            autostartPending = true
-            stopStream()
+            switchStream()
         case .starting:
-            autostartPending = true
-            cancelStart()
+            submitLink()
         case .stopping, .launching, .setup:
             autostartPending = true
         }
@@ -571,8 +753,10 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             self.startTask?.cancel()
             self.setupTask?.cancel()
+            self.switchTask?.cancel()
             await self.startTask?.value
             await self.setupTask?.value
+            await self.switchTask?.value
             await self.teardown()
             await self.docker.stopDesktopIfManaged()
         }

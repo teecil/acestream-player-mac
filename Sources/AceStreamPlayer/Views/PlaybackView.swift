@@ -6,15 +6,26 @@ struct PlaybackView: View {
     @EnvironmentObject private var model: AppModel
     @FocusState private var linkFocused: Bool
 
-    private var editable: Bool { model.phase == .idle }
+    /// The field stays usable while a stream is starting or playing, so another link can be tried.
+    private var editable: Bool {
+        model.phase == .idle || model.phase == .starting || model.phase == .playing
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Ссылка на трансляцию")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                 linkField
+                if model.phase == .playing || model.phase == .starting {
+                    Text(model.phase == .playing
+                         ? "Можно вставить другую ссылку и нажать «Открыть» — текущая будет идти, пока новая не запустится."
+                         : "Не запускается? Вставьте другую ссылку и нажмите «Открыть».")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             PrimaryButton()
@@ -37,6 +48,10 @@ struct PlaybackView: View {
                 }
                 .padding(.top, 4)
             case .playing:
+                if let detail = model.switchDetail {
+                    SwitchingCard(detail: detail)
+                        .transition(.opacity)
+                }
                 LiveCard(stats: model.stats)
                     .transition(.opacity)
             default:
@@ -45,8 +60,13 @@ struct PlaybackView: View {
                         .transition(.opacity)
                 }
             }
+            if model.phase == .playing, model.switchDetail == nil, model.error == nil, let notice = model.notice {
+                Label(notice, systemImage: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
         }
-        .onAppear { if editable { linkFocused = true } }
+        .onAppear { if model.phase == .idle { linkFocused = true } }
     }
 
     private var linkField: some View {
@@ -59,7 +79,7 @@ struct PlaybackView: View {
                 .font(.system(size: 14))
                 .focused($linkFocused)
                 .disabled(!editable)
-                .onSubmit { model.startStream() }
+                .onSubmit { model.submitLink() }
             if editable && !model.link.isEmpty {
                 Button {
                     model.link = ""
@@ -80,6 +100,15 @@ struct PlaybackView: View {
                 .controlSize(.small)
                 .help("Вставить ссылку из буфера обмена")
             }
+            if model.canOpenOtherLink {
+                Button("Открыть") { model.submitLink() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Brand.accent)
+                    .controlSize(.small)
+                    .help(model.phase == .playing
+                          ? "Открыть эту ссылку. Текущая трансляция будет идти, пока новая не запустится."
+                          : "Бросить текущую попытку и открыть эту ссылку")
+            }
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
@@ -95,6 +124,33 @@ struct PlaybackView: View {
     }
 }
 
+/// Shown while a new link is being prepared next to the one that is playing.
+struct SwitchingCard: View {
+    @EnvironmentObject private var model: AppModel
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ProgressView().controlSize(.small)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Открываем новую трансляцию")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(detail + " Текущая продолжает идти.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button("Отменить") { model.cancelSwitch() }
+                .controlSize(.small)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CardBackground(tint: Brand.accent, fillOpacity: 0.07))
+    }
+}
+
+
 struct PrimaryButton: View {
     @EnvironmentObject private var model: AppModel
 
@@ -105,7 +161,6 @@ struct PrimaryButton: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
                 .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
         case .starting:
             Button { model.cancelStart() } label: { label("Отменить", symbol: "xmark") }
                 .buttonStyle(.bordered)

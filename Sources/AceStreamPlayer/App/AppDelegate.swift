@@ -56,6 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.setContentSize(Layout.windowSize)
         window.center()
         window.setFrameAutosaveName("MainWindow")
+        // Keep the remembered position, but always use the current layout size.
+        window.setContentSize(Layout.windowSize)
         window.makeKeyAndOrderFront(nil)
         self.window = window
     }

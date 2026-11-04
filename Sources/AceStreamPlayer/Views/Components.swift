@@ -203,5 +203,5 @@ enum Formatting {
 
 enum Layout {
     /// Fits comfortably on a 13" MacBook Air without scrolling.
-    static let windowSize = CGSize(width: 480, height: 560)
+    static let windowSize = CGSize(width: 480, height: 600)
 }
