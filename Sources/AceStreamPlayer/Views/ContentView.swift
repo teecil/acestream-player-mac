@@ -12,6 +12,12 @@ struct ContentView: View {
             }
             VStack(alignment: .leading, spacing: 22) {
                 HeaderView()
+                if let update = model.availableUpdate, !model.updateBannerDismissed,
+                   model.phase != .chooseLanguage {
+                    UpdateBanner(release: update)
+                        .padding(.top, -8)
+                        .id(model.language)
+                }
                 Group {
                     switch model.phase {
                     case .launching:

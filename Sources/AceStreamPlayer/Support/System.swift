@@ -60,6 +60,12 @@ enum Prefs {
         set { d.set(newValue, forKey: "engineImageID") }
     }
 
+    /// Check GitHub for a newer version on launch. Off unless the user turns it on.
+    static var autoUpdateCheck: Bool {
+        get { d.bool(forKey: "autoUpdateCheck") }
+        set { d.set(newValue, forKey: "autoUpdateCheck") }
+    }
+
     /// UI language; nil until the user picks one on first launch.
     static var language: AppLanguage? {
         get { d.string(forKey: "language").flatMap(AppLanguage.init(rawValue:)) }

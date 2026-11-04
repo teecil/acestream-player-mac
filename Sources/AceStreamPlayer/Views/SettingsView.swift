@@ -53,6 +53,10 @@ struct SettingsPopover: View {
 
             Divider()
 
+            UpdatesSection()
+
+            Divider()
+
             Button(role: .destructive) {
                 close()
                 model.uninstallError = nil
@@ -66,7 +70,98 @@ struct SettingsPopover: View {
             .disabled(!model.canUninstall)
         }
         .padding(16)
-        .frame(width: 250)
+        .frame(width: 270)
+    }
+}
+
+/// Auto-check switch (off by default) and, when it's off, a manual "Check for updates" button.
+struct UpdatesSection: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $model.autoUpdateCheck) {
+                Text(tr("Check for updates automatically", "Проверять обновления автоматически"))
+                    .font(.system(size: 12))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+
+            if !model.autoUpdateCheck {
+                Button(tr("Check for updates", "Проверить обновления")) { model.checkForUpdates() }
+                    .controlSize(.small)
+                    .disabled(model.updateCheckState == .checking)
+            }
+
+            status
+
+            Text(tr("Version \(UpdateChecker.currentVersion)", "Версия \(UpdateChecker.currentVersion)"))
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        if let update = model.availableUpdate {
+            HStack(spacing: 8) {
+                Text(tr("Version \(update.version) is available", "Доступна версия \(update.version)"))
+                    .font(.system(size: 11, weight: .medium))
+                Button(tr("Download", "Скачать")) { model.openUpdatePage() }
+                    .controlSize(.small)
+            }
+        } else {
+            switch model.updateCheckState {
+            case .checking:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text(tr("Checking…", "Проверяем…")).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            case .upToDate:
+                Text(tr("You have the latest version.", "У вас последняя версия."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            case .failed:
+                Text(tr("Couldn't check. Try again later.", "Не удалось проверить. Попробуйте позже."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            case .idle:
+                EmptyView()
+            }
+        }
+    }
+}
+
+/// Shown under the header when a newer version exists. Can be closed; never asks anything.
+struct UpdateBanner: View {
+    @EnvironmentObject private var model: AppModel
+    let release: UpdateRelease
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 15))
+                .foregroundStyle(Brand.accent)
+            Text(tr("Version \(release.version) is available", "Доступна версия \(release.version)"))
+                .font(.system(size: 12, weight: .semibold))
+            Spacer(minLength: 0)
+            Button(tr("Download", "Скачать")) { model.openUpdatePage() }
+                .buttonStyle(.borderedProminent)
+                .tint(Brand.accent)
+                .controlSize(.small)
+            Button {
+                model.updateBannerDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(tr("Hide", "Скрыть"))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(CardBackground(tint: Brand.accent, fillOpacity: 0.07))
     }
 }
 

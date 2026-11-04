@@ -84,6 +84,22 @@ final class AppModel: ObservableObject {
     @Published private(set) var setupHint: String?
     /// UI language. The window is rebuilt when it changes, so every string is re-translated.
     @Published private(set) var language: AppLanguage = L10n.current
+    // Updates
+    enum UpdateCheckState: Equatable {
+        case idle, checking, upToDate, failed
+    }
+
+    /// Off by default; when on, the app checks for a new version on launch.
+    @Published var autoUpdateCheck = Prefs.autoUpdateCheck {
+        didSet {
+            Prefs.autoUpdateCheck = autoUpdateCheck
+            if autoUpdateCheck && availableUpdate == nil { checkForUpdates() }
+        }
+    }
+    @Published private(set) var availableUpdate: UpdateRelease?
+    @Published private(set) var updateCheckState: UpdateCheckState = .idle
+    @Published var updateBannerDismissed = false
+
     /// Uninstall dialog.
     @Published var showingUninstall = false
     /// Progress text while uninstalling (nil when not running).
@@ -153,6 +169,7 @@ final class AppModel: ObservableObject {
         player.onExit = { [weak self] in self?.playerClosedByUser() }
         if link.isEmpty, let last = Prefs.lastLink { link = last }
         refreshSetupItems()
+        if Prefs.autoUpdateCheck { checkForUpdates() }
 
         // Recover from a crash: remove an engine container a previous run may have left behind,
         // and shut down our idle Docker Desktop. Nothing is started here — Docker only runs
@@ -193,6 +210,32 @@ final class AppModel: ObservableObject {
     func prepareForScreenshot() {
         link = ""
         phase = .idle
+    }
+
+    // MARK: - Updates
+
+    /// Asks GitHub whether a newer release exists. Never nags: the result is only shown as a
+    /// banner (if an update exists) and in settings.
+    func checkForUpdates() {
+        guard updateCheckState != .checking else { return }
+        updateCheckState = .checking
+        Task { [weak self] in
+            do {
+                let release = try await UpdateChecker.newerRelease()
+                guard let self else { return }
+                self.availableUpdate = release
+                self.updateBannerDismissed = false
+                self.updateCheckState = release == nil ? .upToDate : .idle
+                Log.info(release.map { "Update available: \($0.version)" } ?? "No update available")
+            } catch {
+                Log.warn("Update check failed: \(error)")
+                self?.updateCheckState = .failed
+            }
+        }
+    }
+
+    func openUpdatePage() {
+        NSWorkspace.shared.open(availableUpdate?.pageURL ?? UpdateChecker.releasesPage)
     }
 
     // MARK: - Uninstall

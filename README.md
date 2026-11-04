@@ -36,6 +36,10 @@ The app is in English and Russian. It asks which one on first launch; you can sw
 
 If something goes wrong, the log is at `~/Library/Logs/AceStreamPlayer/AceStreamPlayer.log` (Help → Show Log).
 
+## Updates
+
+The app doesn't check for updates on its own unless you ask it to. In settings (the gear) you can press "Check for updates" or turn on "Check for updates automatically"; then it checks on launch and shows a small banner when a new version is out. To update, download the new DMG and drag the app into Applications again. Your settings, Docker and IINA stay as they are.
+
 ## Uninstall
 
 Settings (the gear) → Uninstall. By default it removes everything: IINA, Docker Desktop with all its data, and the app itself with its settings. After that the Mac is clean and you can install from scratch. If you want to keep something (say you like IINA or use Docker for other things), tick "I want to keep something" and untick it. Without all three parts the app won't work.

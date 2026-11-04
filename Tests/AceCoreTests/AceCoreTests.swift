@@ -134,3 +134,19 @@ private extension Result {
         return nil
     }
 }
+
+final class VersionTests: XCTestCase {
+    func testComparison() {
+        XCTAssertTrue(Version.isNewer("v1.2.1", than: "1.2.0"))
+        XCTAssertTrue(Version.isNewer("1.10.0", than: "1.9.9"))
+        XCTAssertTrue(Version.isNewer("2.0", than: "1.99.99"))
+        XCTAssertFalse(Version.isNewer("v1.2.0", than: "1.2.0"))
+        XCTAssertFalse(Version.isNewer("1.2", than: "1.2.0"))
+        XCTAssertFalse(Version.isNewer("1.1.4", than: "1.2.0"))
+    }
+
+    func testClean() {
+        XCTAssertEqual(Version.clean("v1.2.0"), "1.2.0")
+        XCTAssertEqual(Version.clean(" 1.2.0\n"), "1.2.0")
+    }
+}
