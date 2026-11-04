@@ -36,7 +36,8 @@ struct ContentView: View {
             .padding(.top, 44)
             .padding(.bottom, 22)
         }
-        .frame(width: Layout.windowSize.width, height: Layout.windowSize.height)
+        .frame(width: Layout.windowSize.width)
+        .frame(minHeight: Layout.windowSize.height, maxHeight: .infinity)
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.2), value: model.phase)
         .animation(.easeInOut(duration: 0.2), value: model.error)
