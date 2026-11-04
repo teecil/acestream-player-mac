@@ -82,6 +82,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var setupItems: [SetupItem] = SetupItem.Kind.allCases.map { SetupItem(kind: $0, status: .pending) }
     @Published private(set) var setupRunning = false
     @Published private(set) var setupHint: String?
+    /// UI language. The window is rebuilt when it changes, so every string is re-translated.
+    @Published private(set) var language: AppLanguage = L10n.current
     /// The link that is currently playing or starting.
     @Published private(set) var activeLink: String?
     /// Non-nil while a new stream is being prepared in the background (the old one keeps playing).
@@ -187,11 +189,12 @@ final class AppModel: ObservableObject {
 
     /// First launch: picks the language and moves on to setup. Later (from the menu): switches
     /// the interface language in place.
-    func setLanguage(_ language: AppLanguage) {
-        Log.info("Language: \(language.rawValue)")
+    func setLanguage(_ language: AppLanguage, persist: Bool = true) {
         L10n.current = language
+        self.language = language // rebuilds the whole window (see ContentView)
+        guard persist else { return }
+        Log.info("Language: \(language.rawValue)")
         Prefs.language = language
-        objectWillChange.send()
         AppDelegate.shared?.rebuildMenu()
         if phase == .chooseLanguage {
             phase = isFullySetUp ? .idle : .setup

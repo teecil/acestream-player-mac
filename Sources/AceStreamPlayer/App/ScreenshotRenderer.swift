@@ -10,12 +10,12 @@ enum ScreenshotRenderer {
         let appearances: [(name: String, appearance: NSAppearance.Name)] = [("dark", .darkAqua), ("light", .aqua)]
         for (appearanceName, appearance) in appearances {
             window.appearance = NSAppearance(named: appearance)
+            NSApp.activate(ignoringOtherApps: true)
             NSApp.activate()
             window.makeKeyAndOrderFront(nil)
             window.makeFirstResponder(nil) // no focus ring in the picture
             for language in AppLanguage.allCases {
-                L10n.current = language
-                model.objectWillChange.send()
+                model.setLanguage(language, persist: false)
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 let file = directory.appendingPathComponent("screenshot-\(language.rawValue)-\(appearanceName).png")
                 if let png = capture(window) {

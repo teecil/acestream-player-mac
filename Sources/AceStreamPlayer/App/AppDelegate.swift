@@ -55,12 +55,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let root = ContentView().environmentObject(model)
         let hosting = NSHostingView(rootView: root)
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: Layout.windowSize),
-            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
+        let rect = NSRect(origin: .zero, size: Layout.windowSize)
+        let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        let window = Layout.solidBackground
+            ? ScreenshotWindow(contentRect: rect, styleMask: style, backing: .buffered, defer: false)
+            : NSWindow(contentRect: rect, styleMask: style, backing: .buffered, defer: false)
         window.title = "AceStream Player"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -195,4 +194,11 @@ enum MainMenu {
         item.submenu = menu
         main.addItem(item)
     }
+}
+
+/// Screenshot mode only: CI can't activate the app, and inactive windows draw accent-coloured
+/// controls in grey. This window always reports itself as active.
+final class ScreenshotWindow: NSWindow {
+    override var isKeyWindow: Bool { true }
+    override var isMainWindow: Bool { true }
 }
