@@ -4,7 +4,7 @@ The first time, macOS will say it can't verify the app, because it isn't signed 
 
 Paste an `acestream://` link and press "Start stream". If a stream doesn't work, paste another link and press "Open"; the current one keeps playing until the new one starts. "Stop" stops everything, Docker included.
 
-Apple Silicon, macOS 14+, about 8 GB free. English and Russian; the app asks on first launch. If something breaks, send the log from Help → Show Log.
+Apple Silicon, macOS 14+, about 4 GB free. English and Russian; the app asks on first launch. If something breaks, send the log from Help → Show Log.
 
 <details>
 <summary>По-русски</summary>
@@ -15,6 +15,6 @@ Apple Silicon, macOS 14+, about 8 GB free. English and Russian; the app asks on 
 
 Вставьте ссылку `acestream://` и нажмите «Запустить трансляцию». Если трансляция не работает, вставьте другую ссылку и нажмите «Открыть»: текущая будет идти, пока новая не запустится. «Выключить» выключает всё, включая Docker.
 
-Нужен Mac на Apple Silicon, macOS 14+, около 8 ГБ свободного места. Если что-то сломалось, пришлите журнал из меню «Справка» → «Показать журнал работы».
+Нужен Mac на Apple Silicon, macOS 14+, около 4 ГБ свободного места. Если что-то сломалось, пришлите журнал из меню «Справка» → «Показать журнал работы».
 
 </details>

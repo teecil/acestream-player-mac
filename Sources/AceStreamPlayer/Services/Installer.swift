@@ -152,7 +152,7 @@ enum Installer {
     }
 
     private static func checkFreeSpace(component: String) throws {
-        let need: Double = component == "Docker Desktop" ? 6 : 1
+        let need: Double = component == "Docker Desktop" ? 4 : 1
         if SystemInfo.freeDiskGB < need { throw AppError.diskFull(needGB: need) }
     }
 

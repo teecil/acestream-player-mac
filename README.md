@@ -17,7 +17,7 @@ Watch Ace Stream on a Mac without setting anything up or figuring anything out.
 
 No terminal, no settings, nothing to understand. Under the hood it runs the Ace Stream engine in Docker Desktop and plays the video in IINA, but you never have to deal with either.
 
-Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 8 GB of free space.
+Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 4 GB of free space.
 
 The app is in English and Russian. It asks which one on first launch; you can switch any time with the EN | RU switch in the top-right corner of the window.
 
