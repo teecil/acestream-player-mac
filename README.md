@@ -1,111 +1,72 @@
-# AceStream Player для macOS
+# AceStream Player for macOS
 
-Нативное приложение для Mac на Apple Silicon. Сценарий использования: **вставил ссылку → «Запустить трансляцию» → смотришь в IINA → «Выключить»**.
-Docker, движок Ace Stream и плеер приложение устанавливает и запускает само.
+English | [Русский](README.ru.md)
 
----
+A small Mac app for watching Ace Stream links. Paste an `acestream://` link, press Start, and the stream opens in IINA. Press Stop when you're done.
 
-## Инструкция для пользователя
+It runs the Ace Stream engine in Docker Desktop and plays the stream in IINA. Both get installed by the app on first launch, so you never need a terminal.
 
-1. Откройте `AceStreamPlayer.dmg` и перетащите **AceStream Player** в папку «Программы».
-2. Запустите приложение. При первом запуске нажмите **«Установить и настроить»**:
-   - приложение скачает видеоплеер IINA и Docker Desktop с официальных сайтов (≈1 ГБ);
-   - macOS **один раз** попросит пароль от Mac — он нужен для установки Docker Desktop;
-   - затем скачается и проверится движок трансляций.
-   Это занимает 5–10 минут и больше не повторяется.
-3. Скопируйте ссылку вида `acestream://…`, вставьте её в поле (⌘V или кнопка «Вставить») и нажмите **«Запустить трансляцию»**.
-   Через 10–40 секунд откроется окно IINA с видео.
-4. Трансляция не работает — вставьте другую ссылку и нажмите **«Открыть»**. Старая будет идти, пока новая не запустится. Если новая не запустится, старая так и продолжит идти.
-5. Закончили — нажмите **«Выключить»**. Плеер закроется, движок остановится.
-   Закрыть окно IINA или само приложение тоже можно: всё выключится автоматически.
+Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 8 GB of free space.
 
-Подсказки:
-- Ссылки `acestream://` в браузере открываются прямо в этом приложении.
-- Если что-то пошло не так, приложение объяснит, в чём дело, и предложит кнопку **«Повторить»**.
-- Меню **Справка → Проверить и установить компоненты…** заново проверит и при необходимости переустановит всё нужное.
+The app interface is in Russian for now.
 
-### Если приложение не открывается (сборка без подписи Apple)
-Сборка подписана локально (ad‑hoc), без сертификата Apple Developer. Если macOS пишет, что не может проверить разработчика:
-**Системные настройки → Конфиденциальность и безопасность → внизу «AceStream Player» → «Открыть всё равно»**.
-Если приложение собрано на этом же Mac через `./build.sh`, такого предупреждения не будет.
+## Install
 
----
+1. Download `AceStreamPlayer.dmg` from [Releases](https://github.com/teecil/acestream-player-mac/releases/latest) and drag the app into Applications.
+2. The app isn't signed with a paid Apple developer certificate, so macOS won't open it the first time. Go to System Settings → Privacy & Security, scroll down and click "Open Anyway".
+3. Press "Установить и настроить" (Install and set up). The app downloads IINA and Docker Desktop, about 1 GB, and asks for your Mac password once to install Docker. This takes 5–10 minutes and only happens once.
 
-## Сборка
+## Use
 
-Нужны macOS 14+ и Xcode или Command Line Tools (`xcode-select --install`).
+- Paste a link and press "Запустить трансляцию" (Start). It takes 20–60 seconds, mostly waiting for Docker to boot.
+- If a stream doesn't work, paste another link and press "Открыть" (Open). The current stream keeps playing until the new one actually starts. If the new one fails, you stay on the old one.
+- Press "Выключить" (Stop) when you're done. The player closes and Docker shuts down, so nothing keeps running in the background. Quitting the app does the same.
+- `acestream://` links clicked in a browser open in the app.
 
-```bash
-./build.sh            # → build/AceStream Player.app, build/AceStreamPlayer.dmg, build/AceStreamPlayer.zip
-swift test            # модульные тесты (разбор ссылок, API движка, Mach-O, вывод docker)
-open Package.swift    # открыть проект в Xcode
-```
+If something goes wrong, the log is at `~/Library/Logs/AceStreamPlayer/AceStreamPlayer.log` (menu Справка → Показать журнал работы).
 
-Для сборки в облаке есть workflow GitHub Actions ([.github/workflows/build.yml](.github/workflows/build.yml)) на раннере `macos-15` (Apple Silicon). Он запускает тесты, собирает приложение и выкладывает DMG как артефакт.
+## How it works
 
-Проверка движка без интерфейса (Docker должен быть запущен):
+- **Engine.** Ace Stream has no official Docker image, and their Linux engine only exists for x86_64. The app uses `jopsis/acestream:v3.2.17-fix`, which has an arm64 build of the engine, so it runs without emulation. If that one won't start, it falls back to Ace Link's `blaiseio/acelink` image (amd64, emulated) and remembers which one worked.
+- **Docker Desktop** comes from docker.com and is installed with Docker's own unattended installer (`install --accept-license --user=…`). It only runs while you're watching. For the copy the app installed, start-at-login and the dashboard pop-up are turned off. A Docker Desktop you installed and started yourself is left alone.
+- **IINA** comes from its GitHub releases. The app launches its own IINA process, so Stop never closes IINA windows you opened yourself.
+- Before installing anything, the app checks it with Gatekeeper (`spctl --assess`) and makes sure the binary is arm64.
+- The engine listens on 127.0.0.1 only, port 16878 or the next free one. Its container has the label `app.acestreamplayer.managed`; the app only ever removes containers with that label and never deletes images. The image is downloaded once (about 100 MB) and reused.
+- Switching streams opens the new link as a second session in the same engine and only swaps players once the engine reports it is downloading.
+- If the app crashes, a small watchdog script removes the container, closes the player and stops Docker. The next launch cleans up anything left over.
+
+## Build
+
+Needs macOS 14+ and Xcode or the Command Line Tools (`xcode-select --install`).
 
 ```bash
-scripts/engine_smoke_test.sh                # образ arm64 → контейнер → API движка
-scripts/engine_smoke_test.sh <content-id>   # плюс реальная трансляция до статуса "dl"
+swift test
+./build.sh     # build/AceStream Player.app, build/AceStreamPlayer.dmg
 ```
 
----
+GitHub Actions builds every push on an Apple Silicon runner. Pushing a `v*` tag publishes the DMG to Releases.
 
-## Как это устроено
+To check Docker, the engine image and the engine API without the app:
 
-| Компонент | Решение | Почему |
-|---|---|---|
-| Интерфейс | AppKit + SwiftUI, одно окно 480×560 | Нативный вид, помещается на экран 13″ без прокрутки |
-| Docker | Docker Desktop, официальный arm64 DMG `desktop.docker.com/mac/main/arm64/Docker.dmg`, установка через официальный `install --accept-license --user=<имя>` | Один запрос пароля, при первом запуске Docker не спрашивает лицензию и привилегии |
-| Управление Docker | Встроенный CLI `Docker.app/Contents/Resources/bin/docker`, `DOCKER_HOST` закреплён на сокете Docker Desktop | Не зависит от PATH и пользовательских контекстов |
-| Движок | `jopsis/acestream:v3.2.17-fix`, платформа **linux/arm64** (нативно) | Официального Docker-образа у Ace Stream нет, а нативный Linux-движок существует только для x86_64. В варианте arm64 этого мультиархитектурного образа Android-сборка движка работает без эмуляции |
-| Запасной движок | `blaiseio/acelink` (образ Ace Link), linux/amd64 | Используется, **только если** arm64-движок не запустился; работает через эмуляцию Docker Desktop. Удачный вариант запоминается |
-| API движка | `/webui/api/service?method=get_version` (готовность), `/ace/getstream?format=json&id=…` (сессия), `stat_url` (статус/пиры), `command_url?method=stop` | Документация docs.acestream.net |
-| Плеер | IINA (официальный релиз с GitHub, universal). Запускается **отдельным процессом** `IINA.app/Contents/MacOS/IINA <url>`, как это делает `iina-cli` | Приложение закрывает только свой экземпляр и не трогает окна IINA, открытые пользователем |
-| Закрытие окна плеера | mpv JSON IPC (`--mpv-input-ipc-server`), опрос `idle-active` | Если пользователь закрыл окно IINA, трансляция тоже выключается |
-| Порт | `127.0.0.1:16878+`, первый свободный | Не конфликтует с Ace Link и другими движками на 6878 и не виден в локальной сети |
+```bash
+scripts/engine_smoke_test.sh               # engine starts and answers
+scripts/engine_smoke_test.sh <content-id>  # plus a real stream
+```
 
-### Жизненный цикл и надёжность
-- Контейнер помечен меткой `app.acestreamplayer.managed`. Приложение удаляет только свои контейнеры и никогда не удаляет образы.
-- **Docker работает только во время трансляции.** Docker Desktop запускается кнопкой «Запустить» и полностью выключается (`docker desktop stop`, вместе с виртуальной машиной) после «Выключить», после ошибки или отмены запуска, после первоначальной настройки и при выходе из приложения. В простое ничего не занимает память. Плата за это — запуск трансляции занимает на 15–30 с дольше, потому что Docker каждый раз стартует заново.
-- Docker Desktop останавливается, только если его **установило** это приложение или **запустило** в текущей сессии, и в нём нет чужих контейнеров. Docker, который пользователь установил и запустил сам, не трогается.
-- В копии Docker Desktop, установленной приложением, отключаются запуск при входе в систему, автооткрытие панели Docker и опрос при первом запуске. Файл `settings-store.json` правится, только когда Docker выключен.
-- **Переключение без выключения**: во время просмотра новая ссылка открывается второй сессией в том же движке (`/ace/getstream` ещё раз). Старая сессия и окно IINA работают, пока новая не перейдёт в статус `dl`. Только после этого старый IINA закрывается, старая сессия останавливается (`command_url?method=stop`) и открывается новый IINA. При ошибке новая сессия закрывается, а старая продолжает играть. Пока трансляция ещё запускается, «Открыть» отменяет текущую попытку, но оставляет движок и Docker запущенными.
-- Образ движка скачивается один раз и хранится в Docker. При выключении удаляется только контейнер, то есть запущенный экземпляр, который пересоздаётся за секунды.
-- **Выключить**: закрыть свой IINA (SIGTERM, через 2,5 с — SIGKILL), `command_url?method=stop`, `docker stop` и `docker rm`, затем остановить Docker Desktop. Если сразу открывается другая ссылка `acestream://`, Docker не перезапускается.
-- **Выход из приложения во время просмотра**: выход откладывается до завершения очистки (не больше 20 с).
-- **Аварийное завершение**: вместе с движком запускается сторожевой процесс `/bin/sh`. Если процесс приложения исчез, он удаляет контейнер, закрывает IINA и останавливает Docker Desktop. Дополнительно при следующем запуске приложения удаляются оставшиеся контейнеры с меткой, закрывается IINA из прошлой сессии (проверяются PID и время запуска) и выключается простаивающий Docker Desktop.
-- Плеер открывается только после того, как движок перешёл в статус `dl` (данные идут). Если есть источники, но движок 15 с остаётся в `prebuf`, плеер всё равно открывается: часть сборок движка начинает загрузку только после подключения плеера.
-- Загрузки проверяются Gatekeeper (`spctl --assess`: подпись Developer ID и нотаризация) и проверкой архитектуры Mach-O (arm64) до установки.
-- Журнал для диагностики: `~/Library/Logs/AceStreamPlayer/AceStreamPlayer.log` (Справка → Показать журнал работы).
+## Status
 
-### Обработанные ситуации
-Docker не установлен / не запущен / не смог запуститься / долго запускается; нет интернета; не скачался образ (сеть, лимит Docker Hub, нет места); движок не отвечает или упал; некорректная ссылка; трансляция не найдена или нет источников; трансляция оборвалась во время просмотра; IINA не установлена или не запустилась; пользователь отменил ввод пароля; закрытие приложения во время просмотра; аварийное завершение.
+Early version. It builds and the unit tests pass in CI, but it hasn't been tested much on real Macs yet. Things to check by hand:
 
----
+- first-time setup on a Mac without Docker and IINA, then a second launch that downloads nothing
+- a real stream plays; Stop closes IINA and the Docker whale disappears from the menu bar
+- Open with a working link switches streams, Open with a dead link keeps the old one
+- Docker doesn't start by itself after a reboot
+- quitting the app or killing it with `kill -9` while watching leaves nothing running
+- no internet, a bad link, a stream with no peers: each shows a readable error
 
-## Чек-лист проверки на Mac (Apple Silicon)
+## Limitations
 
-- [ ] `swift test` проходит, `./build.sh` собирает `.app` (в выводе `lipo -archs` есть `arm64`).
-- [ ] Чистый Mac без Docker и IINA: настройка проходит, пароль запрашивается один раз, все три пункта отмечены зелёным.
-- [ ] Повторный запуск приложения сразу открывает главный экран, ничего не скачивается.
-- [ ] Docker Desktop закрыт → «Запустить» → Docker стартует в фоне, трансляция открывается.
-- [ ] `scripts/engine_smoke_test.sh <id>` → `image architecture: arm64`, статус `dl`.
-- [ ] Реальная трансляция играет в IINA. «Выключить» → окно IINA закрыто, значок Docker исчез из строки меню, в Мониторе системы нет процессов Docker.
-- [ ] После перезагрузки Mac Docker Desktop сам не запускается.
-- [ ] Другая ссылка сразу после остановки запускается.
-- [ ] Во время просмотра вставить рабочую ссылку → «Открыть» → старая идёт, затем плеер переключается на новую.
-- [ ] Во время просмотра вставить мёртвую ссылку → «Открыть» → через ~90 с сообщение «Новая трансляция не запустилась», старая продолжает идти.
-- [ ] Во время запуска вставить другую ссылку → «Открыть» → запуск перезапускается без перезапуска Docker.
-- [ ] Открытый вручную экземпляр IINA не закрывается при «Выключить».
-- [ ] Закрытие окна IINA во время просмотра → приложение возвращается в исходное состояние.
-- [ ] ⌘Q во время просмотра → контейнер удалён, IINA закрыта.
-- [ ] `kill -9` приложения во время просмотра → через ~2 с контейнер удалён, IINA закрыта.
-- [ ] Wi‑Fi выключен → понятная ошибка «Нет подключения к интернету» и кнопка «Повторить».
-- [ ] Неверная ссылка, ссылка на несуществующую трансляцию → понятные сообщения.
-
-## Ограничения
-- Движок — сторонний образ сообщества (официального Docker-образа Ace Stream не существует). Образ закреплён на конкретной версии (`v3.2.17-fix`). Чтобы его сменить, поправьте `EngineImage` в [DockerService.swift](Sources/AceStreamPlayer/Services/DockerService.swift).
-- Docker Desktop бесплатен для личного использования; его лицензионное соглашение принимается автоматически при установке.
-- Для распространения без предупреждения Gatekeeper нужна подпись Developer ID и нотаризация. Пример: `codesign --options runtime --sign "Developer ID Application: …"`, затем `xcrun notarytool submit`.
+- The engine image is a community build pinned to one version. To change it, edit `EngineImage` in [DockerService.swift](Sources/AceStreamPlayer/Services/DockerService.swift).
+- Starting is slower than it could be, because Docker starts from scratch every time.
+- Docker Desktop is free for personal use; the app accepts its license during install.
+- To ship without the Gatekeeper warning you'd need a Developer ID certificate and notarization.
