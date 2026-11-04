@@ -60,6 +60,12 @@ enum Prefs {
         set { d.set(newValue, forKey: "engineImageID") }
     }
 
+    /// True when Docker Desktop on this Mac was installed by this app (so it is ours to stop).
+    static var dockerInstalledByApp: Bool {
+        get { d.bool(forKey: "dockerInstalledByApp") }
+        set { d.set(newValue, forKey: "dockerInstalledByApp") }
+    }
+
     static var lastLink: String? {
         get { d.string(forKey: "lastLink") }
         set { d.set(newValue, forKey: "lastLink") }

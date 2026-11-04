@@ -100,6 +100,7 @@ final class DockerService {
         guard let app = appURL, cliPath != nil else { throw AppError.dockerMissing }
 
         if !isDesktopProcessRunning {
+            DockerSettings.applyQuietDefaultsIfManaged()
             Log.info("Starting Docker Desktop")
             report("Запускаем Docker Desktop…")
             let config = NSWorkspace.OpenConfiguration()
@@ -145,18 +146,41 @@ final class DockerService {
         throw AppError.dockerTimeout
     }
 
-    /// Quits Docker Desktop if we started it and nothing else is running in it.
-    func quitDesktopIfLaunchedByUs() async {
-        guard launchedByUs else { return }
-        if let r = try? await run(["ps", "-q"], timeout: 10), r.ok, !r.stdout.trimmed.isEmpty {
+    /// Docker Desktop is "ours" when this app installed it or started it in this session.
+    /// A Docker Desktop the user installed and started themselves is never stopped.
+    var managesDesktop: Bool { launchedByUs || Prefs.dockerInstalledByApp }
+
+    /// Fully shuts Docker Desktop down (VM included) so it uses no memory or CPU while
+    /// nothing is being watched. Skipped if other containers are running in it.
+    func stopDesktopIfManaged() async {
+        guard managesDesktop else { return }
+        guard isDesktopProcessRunning else {
+            launchedByUs = false
+            DockerSettings.applyQuietDefaultsIfManaged()
+            return
+        }
+        if let r = try? await run(["ps", "-q"], timeout: 15), r.ok, !r.stdout.trimmed.isEmpty {
             Log.info("Other containers are running; leaving Docker Desktop on")
             return
         }
-        Log.info("Quitting Docker Desktop (it was started by this app)")
-        for app in NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID) {
-            app.terminate()
+        Log.info("Stopping Docker Desktop to free resources")
+        let r = try? await run(["desktop", "stop", "--timeout", "60"], timeout: 90)
+        if r?.ok != true { Log.warn("`docker desktop stop` unavailable or failed; asking the app to quit") }
+        if isDesktopProcessRunning {
+            for app in NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID) {
+                app.terminate()
+            }
         }
-        launchedByUs = false
+        for _ in 0..<60 where isDesktopProcessRunning {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        if isDesktopProcessRunning {
+            Log.warn("Docker Desktop is still running after 30 s")
+        } else {
+            Log.info("Docker Desktop stopped")
+            launchedByUs = false
+            DockerSettings.applyQuietDefaultsIfManaged()
+        }
     }
 
     // MARK: - Engine image
@@ -244,6 +268,54 @@ final class DockerService {
     func stopEngine() async {
         _ = try? await run(["stop", "-t", "2", Self.containerName], timeout: 30)
         _ = try? await run(["rm", "-f", Self.containerName], timeout: 30)
+    }
+}
+
+/// For the Docker Desktop this app installed: don't start at login and don't pop up the
+/// dashboard — Docker should only ever run while a stream is on.
+/// Written only while Docker Desktop is not running (it rewrites the file on exit), and only
+/// into a settings file Docker itself has already created.
+enum DockerSettings {
+    private static let wanted: [(key: String, value: Bool)] = [
+        ("AutoStart", false),               // "Start Docker Desktop when you sign in"
+        ("OpenUIOnStartupDisabled", true),  // "Open Docker Dashboard when Docker Desktop starts" → off
+        ("DisplayedOnboarding", true),      // skip the onboarding survey
+    ]
+
+    @MainActor
+    static func applyQuietDefaultsIfManaged() {
+        guard Prefs.dockerInstalledByApp,
+              NSRunningApplication.runningApplications(withBundleIdentifier: DockerService.bundleID).isEmpty else { return }
+        let directory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Group Containers/group.com.docker", isDirectory: true)
+        for name in ["settings-store.json", "settings.json"] {
+            update(directory.appendingPathComponent(name))
+        }
+    }
+
+    private static func update(_ url: URL) {
+        guard let data = try? Data(contentsOf: url),
+              let parsed = try? JSONSerialization.jsonObject(with: data),
+              var settings = parsed as? [String: Any] else { return }
+        // settings-store.json uses PascalCase keys, the legacy settings.json camelCase.
+        let camelCaseFile = settings.keys.contains { $0.first?.isLowercase == true }
+        var changed = false
+        for (pascal, value) in wanted {
+            let camel = pascal.prefix(1).lowercased() + pascal.dropFirst()
+            let key = settings.keys.first { $0 == pascal || $0 == camel } ?? (camelCaseFile ? camel : pascal)
+            if (settings[key] as? Bool) != value {
+                settings[key] = value
+                changed = true
+            }
+        }
+        guard changed,
+              let out = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]) else { return }
+        do {
+            try out.write(to: url, options: .atomic)
+            Log.info("Docker Desktop: disabled start at login and dashboard pop-up (\(url.lastPathComponent))")
+        } catch {
+            Log.warn("Could not update Docker Desktop settings: \(error)")
+        }
     }
 }
 

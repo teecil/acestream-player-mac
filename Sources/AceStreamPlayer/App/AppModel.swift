@@ -116,6 +116,7 @@ final class AppModel: ObservableObject {
     var needsCleanupOnQuit: Bool {
         phase == .starting || phase == .playing || phase == .stopping || setupRunning
             || client != nil || docker.launchedByUs
+            || (docker.managesDesktop && docker.isDesktopProcessRunning)
     }
 
     // MARK: - Launch
@@ -128,10 +129,13 @@ final class AppModel: ObservableObject {
         if link.isEmpty, let last = Prefs.lastLink { link = last }
         refreshSetupItems()
 
-        // Recover from a crash: remove an engine container a previous run may have left behind.
+        // Recover from a crash: remove an engine container a previous run may have left behind,
+        // and shut down our idle Docker Desktop. Nothing is started here — Docker only runs
+        // while a stream is on.
         launchCleanupTask = Task { [weak self] in
             guard let self, self.docker.isInstalled, await self.docker.isDaemonReady() else { return }
             await self.docker.removeOwnContainers()
+            await self.docker.stopDesktopIfManaged()
         }
 
         phase = isFullySetUp ? .idle : .setup
@@ -191,6 +195,7 @@ final class AppModel: ObservableObject {
                 guard docker.isInstalled else {
                     throw AppError.installFailed(component: "Docker Desktop", detail: "приложение не появилось в папке «Программы»")
                 }
+                Prefs.dockerInstalledByApp = true
             }
             setStatus(.docker, .installed)
 
@@ -204,6 +209,8 @@ final class AppModel: ObservableObject {
                 self?.setStatus(.engine, .working(text, fraction))
             }
             await teardown()
+            setStatus(.engine, .working("Выключаем Docker до первой трансляции…", nil))
+            await docker.stopDesktopIfManaged()
             setStatus(.engine, .installed)
 
             Prefs.setupCompleted = true
@@ -212,6 +219,7 @@ final class AppModel: ObservableObject {
         } catch {
             await teardown()
             if Task.isCancelled || error is CancellationError { return }
+            await docker.stopDesktopIfManaged()
             Log.error("Setup failed: \(error)")
             let appError = AppError.wrap(error)
             if let index = setupItems.firstIndex(where: {
@@ -319,6 +327,7 @@ final class AppModel: ObservableObject {
             let cancelled = Task.isCancelled || error is CancellationError
             if cancelled { Log.info("Start cancelled") } else { Log.error("Start failed: \(error)") }
             await teardown()
+            if !isQuitting && !autostartPending { await stopDockerDetached() }
             stats = nil
             if !cancelled && !isQuitting { self.error = AppError.wrap(error) }
             if phase != .setup { phase = .idle }
@@ -360,7 +369,9 @@ final class AppModel: ObservableObject {
 
                 report("Запускаем движок…", nil)
                 let port = try await docker.startEngine(image)
-                if let cli = docker.cliPath { watchdog.arm(dockerCLI: cli, environment: docker.environment()) }
+                if let cli = docker.cliPath {
+                    watchdog.arm(dockerCLI: cli, environment: docker.environment(), stopDocker: docker.managesDesktop)
+                }
                 let client = EngineClient(port: port)
                 self.client = client
 
@@ -499,6 +510,8 @@ final class AppModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             await self.teardown()
+            // Switching straight to another link keeps Docker up; otherwise unload everything.
+            if !self.autostartPending && !self.isQuitting { await self.stopDockerDetached() }
             self.stats = nil
             self.notice = notice
             self.phase = .idle
@@ -522,6 +535,12 @@ final class AppModel: ObservableObject {
             self.watchdog.disarm()
         }
         await work.value
+    }
+
+    /// Shuts down our Docker Desktop; immune to the caller's cancellation.
+    private func stopDockerDetached() async {
+        let docker = self.docker
+        await Task { @MainActor in await docker.stopDesktopIfManaged() }.value
     }
 
     // MARK: - URL scheme & quit
@@ -555,7 +574,7 @@ final class AppModel: ObservableObject {
             await self.startTask?.value
             await self.setupTask?.value
             await self.teardown()
-            await self.docker.quitDesktopIfLaunchedByUs()
+            await self.docker.stopDesktopIfManaged()
         }
         let deadline = Task { try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000)) }
         await withTaskGroup(of: Void.self) { group in

@@ -8,7 +8,7 @@ final class CrashWatchdog {
     private var process: Process?
 
     private static let script = """
-    APP_PID="$1"; DOCKER="$2"; NAME="$3"; PIDFILE="$4"
+    APP_PID="$1"; DOCKER="$2"; NAME="$3"; PIDFILE="$4"; STOP_DOCKER="$5"
     while kill -0 "$APP_PID" 2>/dev/null; do sleep 2; done
     if [ -f "$PIDFILE" ]; then
       P=$(cat "$PIDFILE" 2>/dev/null)
@@ -16,16 +16,21 @@ final class CrashWatchdog {
       rm -f "$PIDFILE"
     fi
     "$DOCKER" rm -f "$NAME" >/dev/null 2>&1
+    if [ "$STOP_DOCKER" = "1" ] && [ -z "$("$DOCKER" ps -q 2>/dev/null)" ]; then
+      "$DOCKER" desktop stop --timeout 60 >/dev/null 2>&1 || \
+        osascript -e 'tell application id "com.docker.docker" to quit' >/dev/null 2>&1
+    fi
     exit 0
     """
 
-    func arm(dockerCLI: String, environment: [String: String]) {
+    func arm(dockerCLI: String, environment: [String: String], stopDocker: Bool) {
         disarm()
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = [
             "-c", Self.script, "acestreamplayer-watchdog",
             String(getpid()), dockerCLI, DockerService.containerName, AppPaths.playerPIDFile.path,
+            stopDocker ? "1" : "0",
         ]
         p.environment = environment
         p.standardInput = FileHandle.nullDevice
