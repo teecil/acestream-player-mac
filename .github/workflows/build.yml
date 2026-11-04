@@ -24,6 +24,17 @@ jobs:
         with:
           name: AceStreamPlayer-arm64
           path: build/AceStreamPlayer.dmg
+      - name: Screenshots (EN/RU, dark/light)
+        timeout-minutes: 3
+        continue-on-error: true
+        run: |
+          "build/AceStream Player.app/Contents/MacOS/AceStreamPlayer" --render-screenshots "$PWD/build/screenshots"
+          ls -la build/screenshots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: build/screenshots
+          if-no-files-found: ignore
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         env:

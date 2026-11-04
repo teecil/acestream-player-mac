@@ -177,6 +177,12 @@ final class AppModel: ObservableObject {
         setStatus(.engine, (Prefs.setupCompleted && docker.isInstalled) ? .installed : .pending)
     }
 
+    /// Screenshot mode: show the main screen without touching Docker, IINA or settings.
+    func prepareForScreenshot() {
+        link = ""
+        phase = .idle
+    }
+
     // MARK: - Language
 
     /// First launch: picks the language and moves on to setup. Later (from the menu): switches

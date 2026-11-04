@@ -29,6 +29,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Hidden mode used by CI to produce README screenshots:
+        //   AceStreamPlayer --render-screenshots <dir>
+        let args = CommandLine.arguments
+        if let flag = args.firstIndex(of: "--render-screenshots"), flag + 1 < args.count {
+            Layout.solidBackground = true
+            model.prepareForScreenshot()
+            showMainWindow()
+            let output = URL(fileURLWithPath: args[flag + 1], isDirectory: true)
+            Task { @MainActor in
+                if let window = self.window { await ScreenshotRenderer.run(window: window, model: self.model, to: output) }
+                exit(0)
+            }
+            return
+        }
         showMainWindow()
         model.onLaunch()
         NSApp.activate()

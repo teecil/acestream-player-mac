@@ -5,7 +5,11 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            VisualEffectBackground()
+            if Layout.solidBackground {
+                Color(nsColor: .windowBackgroundColor)
+            } else {
+                VisualEffectBackground()
+            }
             VStack(alignment: .leading, spacing: 22) {
                 HeaderView()
                 Group {

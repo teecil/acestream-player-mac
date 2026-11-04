@@ -231,6 +231,8 @@ enum Formatting {
 enum Layout {
     /// Fits comfortably on a 13" MacBook Air without scrolling.
     static let windowSize = CGSize(width: 480, height: 600)
+    /// Screenshot mode: the translucent window material can't be captured offscreen.
+    static var solidBackground = false
 }
 
 /// Shown while things install or start: Docker, IINA and macOS dialogs pop up on their own,

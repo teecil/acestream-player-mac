@@ -18,7 +18,7 @@ The app is in English and Russian. It asks which one on first launch; you can sw
 
 ## Use
 
-- Paste a link and press "Start stream". It takes 20–60 seconds, mostly waiting for Docker to boot.
+- Paste a link and press "Start stream". It takes 10–40 seconds, mostly waiting for Docker to boot.
 - If a stream doesn't work, paste another link and press "Open". The current stream keeps playing until the new one actually starts. If the new one fails, you stay on the old one.
 - Press "Stop" when you're done. The player closes and Docker shuts down, so nothing keeps running in the background. Quitting the app does the same.
 - `acestream://` links clicked in a browser open in the app.

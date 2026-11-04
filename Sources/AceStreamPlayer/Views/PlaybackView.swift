@@ -296,7 +296,7 @@ struct IdleHints: View {
             HintRow(symbol: "doc.on.clipboard",
                     text: tr("Copy an acestream://… link and paste it into the field above.", "Скопируйте ссылку acestream://… и вставьте её в поле выше."))
             HintRow(symbol: "play.circle",
-                    text: tr("Press Start stream. The app gets everything ready and opens the video, usually in 20–60 seconds.", "Нажмите «Запустить трансляцию» — приложение само всё подготовит и откроет видео (обычно 20–60 секунд)."))
+                    text: tr("Press Start stream. The app gets everything ready and opens the video, usually in 10–40 seconds.", "Нажмите «Запустить трансляцию» — приложение само всё подготовит и откроет видео (обычно 10–40 секунд)."))
             HintRow(symbol: "leaf",
                     text: tr("While no stream is on, nothing extra is running, so no memory or battery is used.", "Пока трансляция выключена, ничего лишнего не работает и не тратит память и батарею."))
             HintRow(symbol: "globe",
