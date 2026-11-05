@@ -19,8 +19,6 @@ No terminal, no settings, nothing to understand. Under the hood it runs the Ace 
 
 Needs an Apple Silicon Mac (M1 or newer) with macOS 14 or later and about 4 GB of free space.
 
-The app is in English and Russian. It asks which one on first launch; you can switch any time in settings (the gear in the top-right corner).
-
 ## Install
 
 1. Download `AceStreamPlayer.dmg` from [Releases](https://github.com/teecil/acestream-player-mac/releases/latest) and drag the app into Applications.
